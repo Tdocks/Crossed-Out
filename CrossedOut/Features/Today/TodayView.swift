@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // MARK: - Today
 
@@ -7,8 +8,15 @@ struct TodayView: View {
     @State private var path = NavigationPath()
     @State private var showCheckIn = false
     @State private var crossedToday = false
+    @State private var showPraySheet = false
+    @State private var prayedToday: Bool = UserDefaults.standard.bool(forKey: TodayView.prayedTodayKey)
+    @StateObject private var speechController = TodaySpeechController()
 
     private enum TodayRoute: Hashable { case bible, kyra }
+
+    private static var prayedTodayKey: String {
+        "co.prayedToday." + SupabaseService.dayString(Date())
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -37,6 +45,13 @@ struct TodayView: View {
             CheckInSheet()
                 .environmentObject(appState)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showPraySheet) {
+            PrayerSheet {
+                withAnimation { prayedToday = true }
+                UserDefaults.standard.set(true, forKey: TodayView.prayedTodayKey)
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -92,11 +107,26 @@ struct TodayView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                     COIcon(.chevronRight, size: 12, color: .coCrossRed)
+                    if let mood = appState.checkInMood {
+                        moodChip(mood)
+                    }
                 }
             }
             .buttonStyle(.plain)
             .padding(.top, 2)
+            .animation(.easeOut(duration: 0.3), value: appState.checkInMood)
         }
+    }
+
+    private func moodChip(_ mood: Mood) -> some View {
+        Text(mood.label)
+            .font(.coUI(11, weight: .medium))
+            .foregroundColor(.coCrossRed)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.coCrossRed.opacity(0.08)))
+            .overlay(Capsule().strokeBorder(Color.coCrossRed.opacity(0.3), lineWidth: 1))
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
     }
 
     // MARK: Today's Verse
@@ -133,10 +163,44 @@ struct TodayView: View {
     private var verseActions: some View {
         HStack(spacing: 0) {
             actionButton(.bible, "Read") { path.append(TodayRoute.bible) }
-            actionButton(.music, "Listen") { }
+            listenAction
             actionButton(.journal, "Reflect") { path.append(TodayRoute.kyra) }
-            actionButton(.prayer, "Pray") { }
+            prayAction
         }
+    }
+
+    private var listenAction: some View {
+        Button {
+            if speechController.isSpeaking {
+                speechController.stop()
+            } else {
+                speechController.speak(appState.todayEntry.verse.text)
+            }
+        } label: {
+            VStack(spacing: 6) {
+                COIcon(.music, size: 20, color: speechController.isSpeaking ? .coCrossRed : .coInkSecondary)
+                Text("Listen")
+                    .font(.coUI(11))
+                    .foregroundColor(speechController.isSpeaking ? .coCrossRed : .coInkSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var prayAction: some View {
+        Button {
+            showPraySheet = true
+        } label: {
+            VStack(spacing: 6) {
+                COIcon(.prayer, size: 20, color: prayedToday ? .coInkTertiary : .coInkSecondary)
+                CrossOutText("Pray", crossed: prayedToday, size: 11)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func actionButton(_ icon: COIconName, _ label: String,
@@ -232,6 +296,71 @@ private struct CheckInSheet: View {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Prayer Sheet
+
+private struct PrayerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onAmen: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("A PRAYER FOR TODAY")
+                .font(.coUI(11, weight: .semibold))
+                .tracking(1.6)
+                .foregroundColor(.coInkTertiary)
+            Text("Father, thank You that I don't have to carry the weight of my future alone. Give me wisdom in my decisions, peace in uncertainty, and trust that You are preparing something good. Amen.")
+                .font(.coScripture(18, italic: true))
+                .foregroundColor(.coInk)
+                .lineSpacing(7)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            COPrimaryButton(title: "Amen") {
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                onAmen()
+                dismiss()
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Speech Controller
+
+/// Wraps AVSpeechSynthesizer as an ObservableObject so a single instance can
+/// be held via @StateObject and survive body re-evaluations mid-speech.
+private final class TodaySpeechController: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
+    @Published var isSpeaking = false
+    private let synthesizer = AVSpeechSynthesizer()
+
+    override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
+
+    func speak(_ text: String) {
+        guard !text.isEmpty else { return }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = 0.48
+        isSpeaking = true
+        synthesizer.speak(utterance)
+    }
+
+    func stop() {
+        synthesizer.stopSpeaking(at: .immediate)
+        isSpeaking = false
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async { self.isSpeaking = false }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async { self.isSpeaking = false }
     }
 }
 

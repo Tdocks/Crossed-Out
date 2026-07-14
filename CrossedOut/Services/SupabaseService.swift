@@ -411,6 +411,21 @@ extension SupabaseService {
     }
 }
 
+extension SupabaseService {
+    /// Fetches the signed-in user's profile row, if one exists.
+    func fetchProfile() async throws -> ProfileDTO? {
+        guard let uid = currentUserID else { return nil }
+        let rows: [ProfileDTO] = try await client
+            .from("profiles")
+            .select()
+            .eq("id", value: uid)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+}
+
 // MARK: - Writes (best-effort, no-throw)
 
 extension SupabaseService {
@@ -548,6 +563,94 @@ extension SupabaseService {
             try await client.from("bridge_shares").insert(payload).execute()
         } catch {
             print("SupabaseService: insertBridgeShare failed: \(error)")
+        }
+    }
+}
+
+// MARK: - Community RPCs
+
+extension SupabaseService {
+    private struct PrayForParams: Encodable { let request_id: UUID }
+    private struct EncouragePostParams: Encodable { let post_id: UUID }
+
+    /// Calls the `pray_for` RPC and returns the new prayed_count, or nil on error.
+    func prayFor(requestID: UUID) async -> Int? {
+        do {
+            let count: Int = try await client
+                .rpc("pray_for", params: PrayForParams(request_id: requestID))
+                .execute()
+                .value
+            return count
+        } catch {
+            print("SupabaseService: prayFor failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Calls the `encourage_post` RPC and returns the new heart_count, or nil on error.
+    func encouragePost(postID: UUID) async -> Int? {
+        do {
+            let count: Int = try await client
+                .rpc("encourage_post", params: EncouragePostParams(post_id: postID))
+                .execute()
+                .value
+            return count
+        } catch {
+            print("SupabaseService: encouragePost failed: \(error)")
+            return nil
+        }
+    }
+}
+
+// MARK: - Bible Highlights
+
+extension SupabaseService {
+    private struct HighlightRowDTO: Codable { let verse: Int }
+
+    private struct HighlightUpsert: Encodable {
+        let user_id: UUID
+        let book: String
+        let chapter: Int
+        let verse: Int
+    }
+
+    /// Verses highlighted by the current user for a given book/chapter.
+    /// Returns an empty set if unauthenticated or on error.
+    func fetchHighlights(book: String, chapter: Int) async throws -> Set<Int> {
+        guard let uid = currentUserID else { return [] }
+        let rows: [HighlightRowDTO] = try await client
+            .from("user_highlights")
+            .select("verse")
+            .eq("user_id", value: uid)
+            .eq("book", value: book)
+            .eq("chapter", value: chapter)
+            .execute()
+            .value
+        return Set(rows.map { $0.verse })
+    }
+
+    /// Best-effort insert/delete of a single verse highlight for the current user.
+    func setHighlight(book: String, chapter: Int, verse: Int, on: Bool) async {
+        guard let uid = currentUserID else { return }
+        do {
+            if on {
+                let payload = HighlightUpsert(user_id: uid, book: book, chapter: chapter, verse: verse)
+                try await client
+                    .from("user_highlights")
+                    .upsert(payload, onConflict: "user_id,book,chapter,verse", ignoreDuplicates: true)
+                    .execute()
+            } else {
+                try await client
+                    .from("user_highlights")
+                    .delete()
+                    .eq("user_id", value: uid)
+                    .eq("book", value: book)
+                    .eq("chapter", value: chapter)
+                    .eq("verse", value: verse)
+                    .execute()
+            }
+        } catch {
+            print("SupabaseService: setHighlight failed: \(error)")
         }
     }
 }

@@ -1,12 +1,14 @@
 import SwiftUI
+import UIKit
 
 struct BridgeShareView: View {
     var isModal: Bool = false
 
     @Environment(\.dismiss) private var dismiss
     @State private var whyText: String = MockData.bridgeShare.whyText
-    @State private var showConfirmation = false
     @State private var showVersePicker = false
+    @State private var isSharing = false
+    @State private var didSend = false
 
     private let bridgeShare = MockData.bridgeShare
 
@@ -27,8 +29,8 @@ struct BridgeShareView: View {
                     .padding(.bottom, 24)
                 }
 
-                COPrimaryButton(title: "Send the Bridge") {
-                    showConfirmation = true
+                COPrimaryButton(title: didSend ? "Bridge Sent" : "Send the Bridge", tint: didSend ? .coOlive : .coCrossRed) {
+                    sendBridge()
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 10)
@@ -41,7 +43,37 @@ struct BridgeShareView: View {
             }
         }
         .sheet(isPresented: $showVersePicker) { VersePickerStub() }
-        .fullScreenCover(isPresented: $showConfirmation) { BridgeSentConfirmationView() }
+        .sheet(isPresented: $isSharing, onDismiss: handleShareDismiss) {
+            ActivityView(activityItems: [composedShareMessage])
+        }
+    }
+
+    // MARK: Actions
+
+    private func sendBridge() {
+        guard !didSend else { return }
+        let toName = bridgeShare.toName
+        let text = whyText
+        let ref = bridgeShare.verse.ref.display
+        let verseText = bridgeShare.verse.text
+        Task {
+            await SupabaseService.shared.insertBridgeShare(
+                toName: toName, whyText: text, verseRef: ref, verseText: verseText
+            )
+        }
+        isSharing = true
+    }
+
+    private func handleShareDismiss() {
+        withAnimation(.easeInOut(duration: 0.8)) {
+            didSend = true
+        }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+    }
+
+    private var composedShareMessage: String {
+        whyText + "\n\n" + bridgeShare.verse.text + "\n— " + bridgeShare.verse.ref.display
+            + " (BSB)" + "\n\nSent with Crossed Out"
     }
 
     private var header: some View {
@@ -66,7 +98,13 @@ struct BridgeShareView: View {
                     .foregroundColor(.coInkSecondary)
             }
             Spacer()
-            BridgeMotif(width: 140)
+            ZStack {
+                BridgeMotif(width: 140)
+                BridgeArcShape()
+                    .trim(from: 0, to: didSend ? 1 : 0)
+                    .stroke(Color.coOlive, style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+                    .frame(width: 140, height: 140 * 0.42)
+            }
             Spacer()
             VStack(spacing: 8) {
                 COAvatar(initials: "J", size: 44)
@@ -183,35 +221,16 @@ private struct BridgeArcShape: Shape {
     }
 }
 
-private struct BridgeSentConfirmationView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var trimEnd: CGFloat = 0
+/// Wraps UIActivityViewController so the "Send the Bridge" flow can hand off
+/// the composed message to the native iOS share sheet.
+private struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
 
-    var body: some View {
-        ZStack {
-            Color.coPaper.ignoresSafeArea()
-            VStack(spacing: 20) {
-                BridgeArcShape()
-                    .trim(from: 0, to: trimEnd)
-                    .stroke(Color.coCrossRed, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: 160, height: 68)
-
-                Text("Your bridge is on its way.")
-                    .font(.coDisplay(22, weight: .semibold))
-                    .foregroundColor(.coInk)
-
-                Text("Jaden can read it without installing anything.")
-                    .font(.coUI(13))
-                    .foregroundColor(.coInkSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.8)) { trimEnd = 1 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { dismiss() }
-        }
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
     }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {

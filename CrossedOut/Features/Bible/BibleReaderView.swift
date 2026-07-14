@@ -210,11 +210,19 @@ struct BibleReaderView: View {
             )
             .contentShape(Rectangle())
             .onLongPressGesture {
+                let turningOn = !isOn
                 withAnimation(.easeOut(duration: 0.2)) {
                     if isOn { highlighted.remove(verse.number) }
                     else { highlighted.insert(verse.number) }
                 }
                 UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                let book = currentBook
+                let chapterNum = currentChapterNum
+                Task {
+                    await SupabaseService.shared.setHighlight(
+                        book: book, chapter: chapterNum, verse: verse.number, on: turningOn
+                    )
+                }
             }
     }
 
@@ -270,12 +278,16 @@ struct BibleReaderView: View {
     }
 
     private func loadChapter(translation: BibleTranslation, book: String, chapterNum: Int) async {
-        guard let fetched = try? await SupabaseService.shared.fetchChapter(
+        if let fetched = try? await SupabaseService.shared.fetchChapter(
             translation: translation.rawValue, book: book, chapter: chapterNum
-        ), !fetched.verses.isEmpty else {
-            return
+        ), !fetched.verses.isEmpty {
+            chapterData = fetched
         }
-        chapterData = fetched
+        if let fetchedHighlights = try? await SupabaseService.shared.fetchHighlights(
+            book: book, chapter: chapterNum
+        ) {
+            highlighted = fetchedHighlights
+        }
     }
 }
 

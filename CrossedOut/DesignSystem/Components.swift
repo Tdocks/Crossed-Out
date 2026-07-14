@@ -10,6 +10,7 @@ enum StreakDayState: String, Codable, Hashable {
 
 struct COPrimaryButton: View {
     let title: String
+    var tint: Color = .coCrossRed
     let action: () -> Void
 
     var body: some View {
@@ -19,7 +20,7 @@ struct COPrimaryButton: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
-                .background(Color.coCrossRed)
+                .background(tint)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -238,15 +239,17 @@ struct COCheckShape: Shape {
 struct CrossOutText: View {
     let text: String
     let crossed: Bool
+    var size: CGFloat = 15
 
-    init(_ text: String, crossed: Bool) {
+    init(_ text: String, crossed: Bool, size: CGFloat = 15) {
         self.text = text
         self.crossed = crossed
+        self.size = size
     }
 
     var body: some View {
         Text(text)
-            .font(.coUI(15))
+            .font(.coUI(size))
             .foregroundColor(crossed ? .coInkTertiary : .coInk)
             .animation(.easeOut(duration: 0.35), value: crossed)
             .overlay(

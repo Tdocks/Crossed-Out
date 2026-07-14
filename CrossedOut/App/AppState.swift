@@ -17,12 +17,43 @@ final class AppState: ObservableObject {
     @Published var projects: [GiveProject] = []
     @Published var isSupabaseLive = false
 
+    // MARK: - Persistence Keys
+
+    private enum DefaultsKey {
+        static let hasOnboarded = "co.hasOnboarded"
+        static let profile = "co.profile"
+        static let firstOpenDate = "co.firstOpenDate"
+        static let lastCheckInDate = "co.lastCheckInDate"
+        static let todayMoodPrefix = "co.todayMood."
+    }
+
+    // MARK: - Init
+
+    /// Restores persisted onboarding/profile state before bootstrap() runs
+    /// so mock defaults only ever fill in what's still missing.
+    init() {
+        let defaults = UserDefaults.standard
+        hasOnboarded = defaults.bool(forKey: DefaultsKey.hasOnboarded)
+        if let data = defaults.data(forKey: DefaultsKey.profile),
+           let decoded = try? JSONDecoder().decode(UserProfile.self, from: data) {
+            profile = decoded
+        }
+        if let moodRaw = defaults.string(forKey: DefaultsKey.todayMoodPrefix + Self.dayKey()),
+           let mood = Mood(rawValue: moodRaw) {
+            checkInMood = mood
+        }
+    }
+
     // MARK: - Lifecycle
 
     /// Loads initial state. Mock defaults show instantly; Supabase data
     /// replaces individual pieces as each fetch succeeds, independently.
     func bootstrap() async {
-        profile = MockData.profile
+        // Mock fills only what's missing — a restored (persisted) profile
+        // from a completed onboarding is left in place.
+        if !hasOnboarded {
+            profile = MockData.profile
+        }
         todayEntry = MockData.todayEntry
         streak = MockData.streak
         passages = [MockData.proverbs3BSB, MockData.psalm23, MockData.philippians4]
@@ -61,7 +92,34 @@ final class AppState: ObservableObject {
                 isSupabaseLive = true
             }
 
+            // Day number is always derived locally from firstOpenDate, then
+            // refined by remote profile data (if signed in and one exists).
+            let computedDayNumber = currentDayNumber()
+            profile.dayNumber = computedDayNumber
+            persistProfile()
+
             guard signedIn else { return }
+
+            if let remote = try? await service.fetchProfile() {
+                profile = UserProfile(
+                    id: profile.id,
+                    firstName: remote.firstName ?? profile.firstName,
+                    focusAreas: remote.focusAreas ?? profile.focusAreas,
+                    need: remote.need ?? profile.need,
+                    translation: remote.translation ?? profile.translation,
+                    dayNumber: remote.dayNumber ?? computedDayNumber
+                )
+                persistProfile()
+            } else if hasOnboarded {
+                await service.upsertProfile(
+                    firstName: profile.firstName,
+                    need: profile.need,
+                    translation: profile.translation,
+                    dayNumber: profile.dayNumber,
+                    focusAreas: profile.focusAreas
+                )
+            }
+
             if let recommended = await service.recommendPassage(
                 focus: profile.focusAreas,
                 mood: checkInMood?.rawValue
@@ -85,10 +143,58 @@ final class AppState: ObservableObject {
 
     func saveCheckIn(mood: Mood) async {
         checkInMood = mood
+        UserDefaults.standard.set(mood.rawValue, forKey: DefaultsKey.todayMoodPrefix + Self.dayKey())
+
+        if let recommended = await SupabaseService.shared.recommendPassage(
+            focus: profile.focusAreas,
+            mood: mood.rawValue
+        ), recommended != todayEntry.verse {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                todayEntry = DailyEntry(
+                    id: todayEntry.id,
+                    date: todayEntry.date,
+                    greetingName: todayEntry.greetingName,
+                    carryingPrompt: todayEntry.carryingPrompt,
+                    userNeed: todayEntry.userNeed,
+                    verse: recommended,
+                    focusTitle: todayEntry.focusTitle,
+                    focusWhy: todayEntry.focusWhy,
+                    dayNumber: todayEntry.dayNumber
+                )
+            }
+        }
+
+        bumpStreakForCheckInIfNeeded()
+
         Task {
             await SupabaseService.shared.saveCheckIn(mood: mood.rawValue, note: nil)
             await SupabaseService.shared.touchStreak()
         }
+    }
+
+    /// Bumps the streak locally the first time the user checks in on a given
+    /// day, so the UI feels instant even before touchStreak() round-trips.
+    private func bumpStreakForCheckInIfNeeded() {
+        let defaults = UserDefaults.standard
+        let today = Self.dayKey()
+        guard defaults.string(forKey: DefaultsKey.lastCheckInDate) != today else { return }
+        defaults.set(today, forKey: DefaultsKey.lastCheckInDate)
+
+        var newWeekStates = streak.weekStates
+        if let idx = newWeekStates.firstIndex(of: .today) {
+            newWeekStates[idx] = .done
+        }
+        let newCurrent = streak.current + 1
+        streak = StreakState(
+            current: newCurrent,
+            longest: max(streak.longest, newCurrent),
+            graceUsed: streak.graceUsed,
+            graceTotal: streak.graceTotal,
+            weekStates: newWeekStates,
+            weekWithGodDays: streak.weekWithGodDays,
+            weekWithGodTotal: streak.weekWithGodTotal,
+            workingThrough: streak.workingThrough
+        )
     }
 
     // MARK: - Onboarding
@@ -100,10 +206,12 @@ final class AppState: ObservableObject {
             focusAreas: focus,
             need: need,
             translation: MockData.profile.translation,
-            dayNumber: 1
+            dayNumber: currentDayNumber()
         )
         profile = newProfile
         hasOnboarded = true
+        persistHasOnboarded()
+        persistProfile()
         Task {
             await SupabaseService.shared.upsertProfile(
                 firstName: newProfile.firstName,
@@ -113,5 +221,37 @@ final class AppState: ObservableObject {
                 focusAreas: newProfile.focusAreas
             )
         }
+    }
+
+    // MARK: - Persistence Helpers
+
+    private func persistProfile() {
+        guard let data = try? JSONEncoder().encode(profile) else { return }
+        UserDefaults.standard.set(data, forKey: DefaultsKey.profile)
+    }
+
+    private func persistHasOnboarded() {
+        UserDefaults.standard.set(hasOnboarded, forKey: DefaultsKey.hasOnboarded)
+    }
+
+    /// Days since firstOpenDate (persisted on first launch) + 1.
+    private func currentDayNumber() -> Int {
+        let defaults = UserDefaults.standard
+        let firstOpen: Date
+        if let existing = defaults.object(forKey: DefaultsKey.firstOpenDate) as? Date {
+            firstOpen = existing
+        } else {
+            firstOpen = Date()
+            defaults.set(firstOpen, forKey: DefaultsKey.firstOpenDate)
+        }
+        let cal = Calendar(identifier: .gregorian)
+        let start = cal.startOfDay(for: firstOpen)
+        let today = cal.startOfDay(for: Date())
+        let days = cal.dateComponents([.day], from: start, to: today).day ?? 0
+        return max(1, days + 1)
+    }
+
+    private static func dayKey() -> String {
+        SupabaseService.dayString(Date())
     }
 }
