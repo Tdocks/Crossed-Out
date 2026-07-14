@@ -40,7 +40,7 @@ struct GiveView: View {
             }
         }
         .sheet(item: $giveSheetProject) { project in
-            GiveAmountSheet(project: project)
+            GiveLinkOutSheet(project: project)
         }
     }
 
@@ -176,41 +176,25 @@ fileprivate struct ProjectCard: View {
     }
 }
 
-// MARK: - Give Amount Sheet
+// MARK: - Give Link-Out Sheet
 
-fileprivate struct GiveAmountSheet: View {
+fileprivate struct GiveLinkOutSheet: View {
     let project: GiveProject
 
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedAmount: Int? = 25
-    @State private var customAmount: String = ""
-    @State private var didSucceed = false
+    @Environment(\.openURL) private var openURL
 
-    private let amounts = [10, 25, 50, 100]
-
-    private var amountValue: Double? {
-        if let selectedAmount { return Double(selectedAmount) }
-        if let custom = Double(customAmount), custom > 0 { return custom }
-        return nil
+    private var resolvedURL: URL {
+        if let donateURL = project.donateURL, let url = URL(string: donateURL) {
+            return url
+        }
+        let query = "\(project.org) \(project.title) donate"
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return URL(string: "https://www.google.com/search?q=\(encoded)")!
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.coPaper.ignoresSafeArea()
-                if didSucceed {
-                    successState
-                } else {
-                    formState
-                }
-            }
-            .navigationTitle("Give Now")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
-    private var formState: some View {
-        VStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(project.title)
                     .font(.coDisplay(20, weight: .semibold))
@@ -221,80 +205,28 @@ fileprivate struct GiveAmountSheet: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 10) {
-                ForEach(amounts, id: \.self) { amount in
-                    COChip(text: "$\(amount)", selected: selectedAmount == amount) {
-                        selectedAmount = amount
-                        customAmount = ""
-                    }
-                }
-            }
-            TextField("Other amount", text: $customAmount)
-                .keyboardType(.numberPad)
-                .font(.coUI(15))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color.coCard)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.coDivider, lineWidth: 1)
-                )
-                .onChange(of: customAmount) { _, newValue in
-                    if !newValue.isEmpty { selectedAmount = nil }
-                }
+            Text("Giving happens directly with the organization. Crossed Out never touches your donation.")
+                .font(.coUI(13))
+                .foregroundColor(.coInkSecondary)
+
             Spacer()
-            COPrimaryButton(title: giveButtonTitle) {
-                submitGive()
+
+            COPrimaryButton(title: "Continue to Give") {
+                continueToGive()
             }
         }
         .padding(20)
+        .presentationDetents([.medium])
     }
 
-    private var giveButtonTitle: String {
-        guard let amountValue, amountValue > 0 else { return "Give" }
-        return "Give \(formattedAmount(amountValue))"
-    }
-
-    private var successState: some View {
-        VStack(spacing: 14) {
-            Spacer()
-            COIcon(.checkCircle, size: 40, color: .coGold)
-            Text("Thank you.")
-                .font(.coDisplay(22, weight: .semibold))
-                .foregroundColor(.coInk)
-            Text("Your gift intent was recorded. Payment processing arrives in a future update.")
-                .font(.coUI(13))
-                .foregroundColor(.coInkSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 28)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func formattedAmount(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.groupingSeparator = ","
-        formatter.maximumFractionDigits = value == value.rounded() ? 0 : 2
-        let number = formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-        return "$\(number)"
-    }
-
-    private func submitGive() {
-        guard let amountValue, amountValue > 0, !didSucceed else { return }
+    private func continueToGive() {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         let projectID = project.id
         Task {
-            await SupabaseService.shared.recordGiveIntent(projectID: projectID, amount: amountValue)
+            await SupabaseService.shared.recordGiveIntent(projectID: projectID, amount: 0)
         }
-        withAnimation(.easeOut(duration: 0.25)) {
-            didSucceed = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            dismiss()
-        }
+        openURL(resolvedURL)
+        dismiss()
     }
 }
 

@@ -70,6 +70,7 @@
 		CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchFinderView.swift; sourceTree = "<group>"; };
 		D4C2068096DEA50273F324B8 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D722B64EEA03E7C1D5D3586D /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		D867BC82BB6EE744CBC03EB5 /* CrossedOut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrossedOut.entitlements; sourceTree = "<group>"; };
 		DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSheet.swift; sourceTree = "<group>"; };
 		E416CE180C9BE0CF3CED42AF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderService.swift; sourceTree = "<group>"; };
@@ -177,6 +178,7 @@
 		7CC6FF9CB551E643131BDC65 /* CrossedOut */ = {
 			isa = PBXGroup;
 			children = (
+				D867BC82BB6EE744CBC03EB5 /* CrossedOut.entitlements */,
 				70915A1FA5552010F52A190A /* Info.plist */,
 				1E385371AC3BF180367E3289 /* App */,
 				7BD06A3CFA0CC09A0A467C8B /* DesignSystem */,
@@ -335,7 +337,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					A4467E10A41E0D9A90C308AC = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = Q9ZH8AA9NY;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -420,10 +422,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = CrossedOut/CrossedOut.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = CrossedOut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -505,10 +508,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = CrossedOut/CrossedOut.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = CrossedOut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -167,6 +167,7 @@ struct GiveProject: Identifiable, Codable, Hashable {
     let raised: Int
     let goal: Int
     var dateRange: String?
+    var donateURL: String? = nil
 
     var progress: Double {
         guard goal > 0 else { return 0 }

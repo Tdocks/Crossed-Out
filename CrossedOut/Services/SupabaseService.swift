@@ -256,14 +256,16 @@ struct GiveProjectDTO: Codable {
     let raised: Double
     let goal: Double
     let dateRange: String?
+    let donateURL: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, org, raised, goal
         case dateRange = "date_range"
+        case donateURL = "donate_url"
     }
 
     func toModel() -> GiveProject {
-        GiveProject(id: id, title: title, org: org, raised: Int(raised), goal: Int(goal), dateRange: dateRange)
+        GiveProject(id: id, title: title, org: org, raised: Int(raised), goal: Int(goal), dateRange: dateRange, donateURL: donateURL)
     }
 }
 

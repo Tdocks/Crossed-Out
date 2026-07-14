@@ -24,8 +24,9 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.9"
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: Q9ZH8AA9NY
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: CrossedOut/CrossedOut.entitlements
         ENABLE_USER_SCRIPT_SANDBOXING: NO
     info:
       path: CrossedOut/Info.plist

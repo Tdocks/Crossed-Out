@@ -56,3 +56,6 @@ create table if not exists public.give_intents (
 alter table public.give_intents enable row level security;
 create policy "own give intents" on public.give_intents
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Give link-out
+alter table public.give_projects add column if not exists donate_url text;
