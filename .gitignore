@@ -1,5 +1,6 @@
 build/
 DerivedData/
+supabase/.env.local
 *.xcuserstate
 xcuserdata/
 .DS_Store

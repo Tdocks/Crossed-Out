@@ -8,6 +8,14 @@ enum SupabaseConfig {
     static let key = "sb_publishable_W6kfGB2XfRAYvV_kfe_tWA_NiAdhZmL"
 }
 
+// MARK: - Bible Translations
+
+enum BibleTranslation: String, CaseIterable {
+    case bsb = "BSB"
+    case web = "WEB"
+    case kjv = "KJV"
+}
+
 // MARK: - Service
 
 @MainActor
@@ -307,9 +315,32 @@ struct CheckInDTO: Codable {
     }
 }
 
+// MARK: - Bible Verse DTO
+
+struct BibleVerseDTO: Codable {
+    let verse: Int
+    let text: String
+}
+
 // MARK: - Fetch
 
 extension SupabaseService {
+    /// Fetches a single chapter's verses for a given translation/book/chapter,
+    /// ordered by verse ascending, and maps them into a BibleChapter.
+    func fetchChapter(translation: String, book: String, chapter: Int) async throws -> BibleChapter {
+        let dtos: [BibleVerseDTO] = try await client
+            .from("bible_verses")
+            .select("verse,text")
+            .eq("translation", value: translation)
+            .eq("book", value: book)
+            .eq("chapter", value: chapter)
+            .order("verse", ascending: true)
+            .execute()
+            .value
+        let verses = dtos.map { BibleVerse(number: $0.verse, text: $0.text) }
+        return BibleChapter(book: book, chapter: chapter, translation: translation, heading: "", verses: verses)
+    }
+
     func fetchPassages(topics: [String]? = nil) async throws -> [Passage] {
         let dtos: [PassageDTO] = try await client
             .from("passages")
@@ -580,5 +611,57 @@ extension SupabaseService {
             .select()
             .execute()
             .value
+    }
+}
+
+// MARK: - Kyra AI Chat
+
+enum KyraServiceError: Error {
+    case badResponse
+    case missingText
+}
+
+private struct KyraRequestMessage: Encodable {
+    let role: String
+    let text: String
+}
+
+private struct KyraRequestBody: Encodable {
+    let messages: [KyraRequestMessage]
+    let firstName: String?
+}
+
+private struct KyraResponseBody: Decodable {
+    let text: String?
+}
+
+extension SupabaseService {
+    /// Calls the "kyra" Supabase Edge Function with the full chat history and
+    /// returns Kyra's reply text. Uses URLSession directly (simplest — no
+    /// need to fight the SDK's functions client for a plain JSON POST).
+    func askKyra(messages: [ChatMessage], firstName: String?) async throws -> String {
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/kyra")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(SupabaseConfig.key)", forHTTPHeaderField: "Authorization")
+        request.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = KyraRequestBody(
+            messages: messages.map { KyraRequestMessage(role: $0.role.rawValue, text: $0.text) },
+            firstName: firstName
+        )
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw KyraServiceError.badResponse
+        }
+        let decoded = try JSONDecoder().decode(KyraResponseBody.self, from: data)
+        guard let text = decoded.text, !text.isEmpty else {
+            throw KyraServiceError.missingText
+        }
+        return text
     }
 }

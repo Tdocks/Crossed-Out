@@ -4,6 +4,7 @@ import SwiftUI
 
 struct KyraView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appState: AppState
 
     @State private var messages: [ChatMessage] = Array(MockData.kyraConversation.prefix(2))
     @State private var input: String = ""
@@ -160,9 +161,28 @@ struct KyraView: View {
             messages.append(ChatMessage(role: .user, text: trimmed))
         }
         input = ""
-        reflectThen([
+        askKyraThen(fallback: [
             ChatMessage(role: .kyra, text: "That's worth sitting with. Many Christians find that bringing this honestly to God in prayer is the best first step. Would you like a verse that speaks to it?")
         ])
+    }
+
+    /// Tries the live Kyra edge function first; on ANY failure (not deployed
+    /// yet, network error, bad response, etc.) falls back to the canned
+    /// reply silently and instantly — the user should never see an error.
+    private func askKyraThen(fallback: [ChatMessage]) {
+        withAnimation(.easeOut(duration: 0.25)) { isReflecting = true }
+        let history = messages
+        let firstName = appState.profile.firstName
+        Task {
+            var replies = fallback
+            if let text = try? await SupabaseService.shared.askKyra(messages: history, firstName: firstName) {
+                replies = [ChatMessage(role: .kyra, text: text)]
+            }
+            withAnimation(.easeOut(duration: 0.3)) {
+                isReflecting = false
+                messages.append(contentsOf: replies)
+            }
+        }
     }
 
     private func reflectThen(_ replies: [ChatMessage]) {

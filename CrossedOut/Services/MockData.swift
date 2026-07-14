@@ -9,7 +9,7 @@ enum MockData {
         firstName: "Tyler",
         focusAreas: ["Financial Wisdom"],
         need: "I need wisdom about money and direction.",
-        translation: "NIV",
+        translation: "BSB",
         dayNumber: 16
     )
 
@@ -22,24 +22,24 @@ enum MockData {
         topics: ["trust", "anxiety", "guidance", "finance"]
     )
 
-    static let proverbs3NIV = Passage(
+    static let proverbs3BSB = Passage(
         ref: VerseRef(book: "Proverbs", chapter: 3, verseStart: 5, verseEnd: 6),
-        translation: "NIV",
-        text: "Trust in the Lord with all your heart and lean not on your own understanding; in all your ways submit to him, and he will make your paths straight.",
+        translation: "BSB",
+        text: "Trust in the LORD with all your heart, and lean not on your own understanding; in all your ways acknowledge Him, and He will make your paths straight.",
         topics: ["trust", "anxiety", "guidance", "finance"]
     )
 
     static let psalm23 = Passage(
         ref: VerseRef(book: "Psalm", chapter: 23, verseStart: 1, verseEnd: 3),
-        translation: "NIV",
-        text: "The Lord is my shepherd, I lack nothing. He makes me lie down in green pastures, he leads me beside quiet waters, he refreshes my soul.",
+        translation: "BSB",
+        text: "A Psalm of David. The LORD is my shepherd; I shall not want. He makes me lie down in green pastures; He leads me beside quiet waters. He restores my soul; He guides me in the paths of righteousness for the sake of His name.",
         topics: ["peace", "rest", "trust"]
     )
 
     static let philippians4 = Passage(
         ref: VerseRef(book: "Philippians", chapter: 4, verseStart: 6, verseEnd: 7),
-        translation: "NIV",
-        text: "Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God.",
+        translation: "BSB",
+        text: "Be anxious for nothing, but in everything, by prayer and petition, with thanksgiving, present your requests to God. And the peace of God, which surpasses all understanding, will guard your hearts and your minds in Christ Jesus.",
         topics: ["anxiety", "peace", "prayer"]
     )
 
@@ -51,7 +51,7 @@ enum MockData {
             greetingName: "Tyler",
             carryingPrompt: "What are you carrying today?",
             userNeed: "I need wisdom about money and direction.",
-            verse: proverbs3NIV,
+            verse: proverbs3BSB,
             focusTitle: "Financial Wisdom",
             focusWhy: "You've been focusing on financial wisdom and trusting God's plan.",
             dayNumber: 16
@@ -70,13 +70,13 @@ enum MockData {
     static let john14 = BibleChapter(
         book: "John",
         chapter: 14,
-        translation: "NIV",
+        translation: "BSB",
         heading: "Jesus Comforts His Disciples",
         verses: [
-            BibleVerse(number: 1, text: "\"Do not let your hearts be troubled. You believe in God; believe also in me."),
-            BibleVerse(number: 2, text: "My Father's house has many rooms; if that were not so, would I have told you that I am going there to prepare a place for you?"),
-            BibleVerse(number: 3, text: "And if I go and prepare a place for you, I will come back and take you to be with me that you also may be where I am."),
-            BibleVerse(number: 4, text: "You know the way to the place where I am going.\"")
+            BibleVerse(number: 1, text: "“Do not let your hearts be troubled. You believe in God; believe in Me as well."),
+            BibleVerse(number: 2, text: "In My Father’s house are many rooms. If it were not so, would I have told you that I am going there to prepare a place for you?"),
+            BibleVerse(number: 3, text: "And if I go and prepare a place for you, I will come back and welcome you into My presence, so that you also may be where I am."),
+            BibleVerse(number: 4, text: "You know the way to the place where I am going.”")
         ]
     )
 
@@ -124,7 +124,7 @@ enum MockData {
         CommunityPost(authorName: "Mark D.", timeAgo: "5h ago", kind: .verseShare,
                       text: "This got me through today.",
                       verseRef: "John 16:33",
-                      verseText: "I have told you these things, so that in me you may have peace. In this world you will have trouble. But take heart! I have overcome the world.",
+                      verseText: "I have told you these things so that in Me you may have peace. In the world you will have tribulation. But take courage; I have overcome the world!",
                       heartCount: 18)
     ]
 

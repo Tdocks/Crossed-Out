@@ -25,7 +25,7 @@ final class AppState: ObservableObject {
         profile = MockData.profile
         todayEntry = MockData.todayEntry
         streak = MockData.streak
-        passages = [MockData.proverbs3NIV, MockData.psalm23, MockData.philippians4]
+        passages = [MockData.proverbs3BSB, MockData.psalm23, MockData.philippians4]
         prayers = MockData.prayerRequests
         posts = MockData.communityPosts
         churches = MockData.churches
