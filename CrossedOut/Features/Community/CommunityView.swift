@@ -28,6 +28,15 @@ struct CommunityView: View {
                         COSectionHeader(title: "Prayer Requests", actionTitle: "See all", action: {})
                         if let request = displayedPrayer {
                             prayerCard(request)
+                        } else {
+                            COEmptyState(
+                                icon: .prayer,
+                                title: "No prayer requests yet",
+                                message: "Be the first to share what you're carrying — your circle is here for you.",
+                                actionTitle: "Share a request"
+                            ) {
+                                showNewPost = true
+                            }
                         }
                         if let post = displayedPost {
                             verseCard(post)

@@ -647,9 +647,11 @@ private struct NotesListSheet: View {
                 .tracking(1.6)
                 .foregroundColor(.coInkTertiary)
             if notes.isEmpty {
-                Text("No notes yet for this chapter.")
-                    .font(.coUI(14))
-                    .foregroundColor(.coInkSecondary)
+                COEmptyState(
+                    icon: .note,
+                    title: "No notes in this chapter",
+                    message: "Long-press any verse to add one."
+                )
                 Spacer()
             } else {
                 ScrollView(showsIndicators: false) {

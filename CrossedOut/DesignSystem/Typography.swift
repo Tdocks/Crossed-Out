@@ -22,6 +22,21 @@ private enum FontCandidates {
     static let uiItalic = ["Inter-Italic", "Inter", "Inter-Regular"]
 }
 
+// MARK: - Dynamic Type Mapping
+
+/// Maps a fixed point size to the closest Dynamic Type relative text style,
+/// so custom fonts declared with a base size still scale with the user's
+/// preferred text size via `Font.custom(_:size:relativeTo:)`.
+func relativeStyle(for size: CGFloat) -> Font.TextStyle {
+    switch size {
+    case 28...: return .largeTitle
+    case 22..<28: return .title2
+    case 17..<22: return .body
+    case 13..<17: return .callout
+    default: return .caption
+    }
+}
+
 // MARK: - Crossed Out Typefaces
 
 extension Font {
@@ -29,7 +44,7 @@ extension Font {
     static func coScripture(_ size: CGFloat, italic: Bool = false) -> Font {
         let candidates = italic ? FontCandidates.scriptureItalic : FontCandidates.scripture
         if let name = resolvedFontName(candidates) {
-            return .custom(name, size: size)
+            return .custom(name, size: size, relativeTo: relativeStyle(for: size))
         }
         let base = Font.system(size: size, design: .serif)
         return italic ? base.italic() : base
@@ -39,7 +54,7 @@ extension Font {
     /// bundled Playfair is a variable font without discrete named PostScript faces.
     static func coDisplay(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
         if let name = resolvedFontName(FontCandidates.displaySemibold) {
-            return .custom(name, size: size).weight(weight)
+            return .custom(name, size: size, relativeTo: relativeStyle(for: size)).weight(weight)
         }
         return .system(size: size, design: .serif).weight(weight)
     }
@@ -47,7 +62,7 @@ extension Font {
     /// Inter for all UI chrome and body copy.
     static func coUI(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         if let name = resolvedFontName(FontCandidates.ui) {
-            return .custom(name, size: size).weight(weight)
+            return .custom(name, size: size, relativeTo: relativeStyle(for: size)).weight(weight)
         }
         return .system(size: size, design: .default).weight(weight)
     }
@@ -55,7 +70,7 @@ extension Font {
     /// Inter italic for quiet emphasis in UI copy.
     static func coUIItalic(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         if let name = resolvedFontName(FontCandidates.uiItalic) {
-            return .custom(name, size: size).weight(weight)
+            return .custom(name, size: size, relativeTo: relativeStyle(for: size)).weight(weight)
         }
         return .system(size: size, design: .default).weight(weight).italic()
     }

@@ -23,6 +23,9 @@ struct TodayView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     header
+                    if appState.isOffline {
+                        offlineBanner
+                    }
                     greetingBlock
                     verseCard
                     focusCard
@@ -86,6 +89,22 @@ struct TodayView: View {
         let weekday = wd.string(from: now).uppercased()
         let day = md.string(from: now).uppercased()
         return "\(weekday) • \(day) • DAY \(appState.profile.dayNumber)"
+    }
+
+    // MARK: Offline Banner
+
+    /// A quiet hairline notice shown only when every bootstrap fetch failed,
+    /// reassuring the user that saved content is still safe to use.
+    private var offlineBanner: some View {
+        HStack(spacing: 6) {
+            COIcon(.leaf, size: 11, color: .coInkTertiary)
+            Text("Offline — showing your saved content.")
+                .font(.coUI(12))
+                .foregroundColor(.coInkTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 12)
+        .overlay(alignment: .bottom) { CODivider() }
     }
 
     // MARK: Greeting

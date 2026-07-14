@@ -4,6 +4,18 @@ import Foundation
 // MARK: - Attend
 
 struct AttendView: View {
+    @EnvironmentObject private var appState: AppState
+
+    /// Unscheduled services ("18m", "45m") derived from the appState feed.
+    private var startingSoonServices: [LiveService] {
+        appState.services.filter { $0.time == nil }
+    }
+
+    /// Time-scheduled services (e.g. "9:00 AM") derived from the appState feed.
+    private var tomorrowServicesList: [LiveService] {
+        appState.services.filter { $0.time != nil }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -15,9 +27,21 @@ struct AttendView: View {
                             .foregroundColor(.coInk)
                             .padding(.top, 8)
 
-                        liveNowSection
-                        startingSoonSection
-                        tomorrowSection
+                        if appState.services.isEmpty {
+                            COEmptyState(
+                                icon: .attend,
+                                title: "No services right now",
+                                message: "Check back Sunday morning — or explore churches near you."
+                            )
+                        } else {
+                            liveNowSection
+                            if !startingSoonServices.isEmpty {
+                                startingSoonSection
+                            }
+                            if !tomorrowServicesList.isEmpty {
+                                tomorrowSection
+                            }
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 90)
@@ -100,9 +124,9 @@ struct AttendView: View {
             COSectionHeader(title: "Starting Soon")
                 .padding(.bottom, 10)
             VStack(spacing: 0) {
-                ForEach(Array(MockData.startingSoon.enumerated()), id: \.element.id) { index, service in
+                ForEach(Array(startingSoonServices.enumerated()), id: \.element.id) { index, service in
                     ServiceRow(service: service, rightLabel: service.startsIn)
-                    if index < MockData.startingSoon.count - 1 {
+                    if index < startingSoonServices.count - 1 {
                         CODivider()
                     }
                 }
@@ -117,9 +141,9 @@ struct AttendView: View {
             COSectionHeader(title: "Tomorrow Morning")
                 .padding(.bottom, 10)
             VStack(spacing: 0) {
-                ForEach(Array(MockData.tomorrowServices.enumerated()), id: \.element.id) { index, service in
+                ForEach(Array(tomorrowServicesList.enumerated()), id: \.element.id) { index, service in
                     ServiceRow(service: service, rightLabel: service.time ?? service.startsIn)
-                    if index < MockData.tomorrowServices.count - 1 {
+                    if index < tomorrowServicesList.count - 1 {
                         CODivider()
                     }
                 }
@@ -182,4 +206,5 @@ fileprivate struct COPlaceholderBlock: View {
 
 #Preview {
     AttendView()
+        .environmentObject(AppState())
 }

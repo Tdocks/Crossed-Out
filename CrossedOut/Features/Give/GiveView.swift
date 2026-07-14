@@ -12,6 +12,7 @@ private enum GiveTab: String, CaseIterable, Hashable {
 // MARK: - Give
 
 struct GiveView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var selectedTab: GiveTab = .give
     @State private var giveSheetProject: GiveProject?
 
@@ -104,10 +105,18 @@ struct GiveView: View {
     private var activeProjectsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             COSectionHeader(title: "Active Projects")
-            VStack(spacing: 12) {
-                ForEach(MockData.giveProjects) { project in
-                    ProjectCard(project: project) {
-                        giveSheetProject = project
+            if appState.projects.isEmpty {
+                COEmptyState(
+                    icon: .give,
+                    title: "No active projects",
+                    message: "New giving opportunities are coming soon."
+                )
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(appState.projects) { project in
+                        ProjectCard(project: project) {
+                            giveSheetProject = project
+                        }
                     }
                 }
             }
@@ -330,4 +339,5 @@ fileprivate struct COPlaceholderBlock: View {
 
 #Preview {
     GiveView()
+        .environmentObject(AppState())
 }

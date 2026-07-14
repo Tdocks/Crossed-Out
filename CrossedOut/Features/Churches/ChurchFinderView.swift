@@ -5,6 +5,7 @@ import UIKit
 // MARK: - Church Finder
 
 struct ChurchFinderView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var showFilter = false
     @State private var savedChurchIDs: Set<UUID> = []
 
@@ -20,9 +21,17 @@ struct ChurchFinderView: View {
 
                     locationRow
 
-                    VStack(spacing: 12) {
-                        ForEach(MockData.churches) { church in
-                            churchRow(church)
+                    if appState.churches.isEmpty {
+                        COEmptyState(
+                            icon: .church,
+                            title: "No churches found",
+                            message: "Try widening your search area."
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(appState.churches) { church in
+                                churchRow(church)
+                            }
                         }
                     }
 
@@ -202,4 +211,5 @@ fileprivate struct ChurchFilterSheet: View {
 
 #Preview {
     ChurchFinderView()
+        .environmentObject(AppState())
 }

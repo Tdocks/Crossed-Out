@@ -14,6 +14,7 @@
 		20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301F62AED89C820CD3369957 /* ServiceDetailView.swift */; };
 		20D200C1A012404A338C0F35 /* TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFA439125C7FB6B3DC9361B /* TabBar.swift */; };
 		29C3C08C042DBD4D2AFC7567 /* JourneyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8418F244D418C4D90CD398C /* JourneyProgressView.swift */; };
+		3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB434650612A2DEA8A15E75 /* EmptyState.swift */; };
 		3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */; };
 		53CF5D584110140D5EC53180 /* AttendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D763F517ED1ACDD00971A01 /* AttendView.swift */; };
 		5C1B817C91057A4B7D0FBB38 /* KyraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7895D987D6316A315E2BE5C0 /* KyraView.swift */; };
@@ -58,6 +59,7 @@
 		6D009328117B445BCDD40BDE /* PlayfairDisplay-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlayfairDisplay-Italic.ttf"; sourceTree = "<group>"; };
 		70915A1FA5552010F52A190A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7895D987D6316A315E2BE5C0 /* KyraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyraView.swift; sourceTree = "<group>"; };
+		7CB434650612A2DEA8A15E75 /* EmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyState.swift; sourceTree = "<group>"; };
 		7F5E91BE154B378075E6F78E /* MoreHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreHubView.swift; sourceTree = "<group>"; };
 		8817ED9B69880386FF44CCF4 /* CrossedOutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossedOutApp.swift; sourceTree = "<group>"; };
 		88745AB55D413F7CE574533E /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				583F1B69EE280361D4A18B79 /* Components.swift */,
+				7CB434650612A2DEA8A15E75 /* EmptyState.swift */,
 				0D4A83A506B6EF6EB332363A /* Icons.swift */,
 				3CFA439125C7FB6B3DC9361B /* TabBar.swift */,
 				D722B64EEA03E7C1D5D3586D /* Theme.swift */,
@@ -388,6 +391,7 @@
 				67FD6C93898D75B938F6D671 /* CommunityView.swift in Sources */,
 				181037C41BB02857ECE062B5 /* Components.swift in Sources */,
 				1429F8BC18D96F26E8EBED59 /* CrossedOutApp.swift in Sources */,
+				3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */,
 				83BB1E5EFFEE74E103313217 /* ExploreView.swift in Sources */,
 				D8F02082223345F0AFFDCE06 /* GiveView.swift in Sources */,
 				5FDFABA1360DCE82F2A126E8 /* Icons.swift in Sources */,

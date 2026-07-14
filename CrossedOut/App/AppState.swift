@@ -16,6 +16,7 @@ final class AppState: ObservableObject {
     @Published var services: [LiveService] = []
     @Published var projects: [GiveProject] = []
     @Published var isSupabaseLive = false
+    @Published var isOffline = false
     @Published var workingItems: [WorkingItem] = MockData.streak.workingThrough
     @Published var weekRhythm: [String: Int] = [:]
 
@@ -70,30 +71,45 @@ final class AppState: ObservableObject {
             let service = SupabaseService.shared
             let signedIn = await service.signInAnonymouslyIfNeeded()
 
-            if let fetched = try? await service.fetchPassages(topics: nil), !fetched.isEmpty {
+            let passagesResult = try? await service.fetchPassages(topics: nil)
+            if let fetched = passagesResult, !fetched.isEmpty {
                 passages = fetched
                 isSupabaseLive = true
             }
-            if let fetched = try? await service.fetchPrayerRequests() {
+            let prayersResult = try? await service.fetchPrayerRequests()
+            if let fetched = prayersResult {
                 prayers = fetched
                 isSupabaseLive = true
             }
-            if let fetched = try? await service.fetchCommunityPosts() {
+            let postsResult = try? await service.fetchCommunityPosts()
+            if let fetched = postsResult {
                 posts = fetched
                 isSupabaseLive = true
             }
-            if let fetched = try? await service.fetchChurches(), !fetched.isEmpty {
+            let churchesResult = try? await service.fetchChurches()
+            if let fetched = churchesResult, !fetched.isEmpty {
                 churches = fetched
                 isSupabaseLive = true
             }
-            if let fetched = try? await service.fetchLiveServices(), !fetched.isEmpty {
+            let servicesResult = try? await service.fetchLiveServices()
+            if let fetched = servicesResult, !fetched.isEmpty {
                 services = fetched
                 isSupabaseLive = true
             }
-            if let fetched = try? await service.fetchGiveProjects(), !fetched.isEmpty {
+            let projectsResult = try? await service.fetchGiveProjects()
+            if let fetched = projectsResult, !fetched.isEmpty {
                 projects = fetched
                 isSupabaseLive = true
             }
+
+            // Quiet offline signal: only trip when every single bootstrap
+            // fetch failed outright (not merely "returned empty").
+            isOffline = passagesResult == nil
+                && prayersResult == nil
+                && postsResult == nil
+                && churchesResult == nil
+                && servicesResult == nil
+                && projectsResult == nil
 
             // Day number is always derived locally from firstOpenDate, then
             // refined by remote profile data (if signed in and one exists).
