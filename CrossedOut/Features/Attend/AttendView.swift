@@ -5,22 +5,25 @@ import Foundation
 
 struct AttendView: View {
     var body: some View {
-        ZStack {
-            Color.coPaper.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text("Attend")
-                        .font(.coDisplay(30, weight: .semibold))
-                        .foregroundColor(.coInk)
-                        .padding(.top, 8)
+        NavigationStack {
+            ZStack {
+                Color.coPaper.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        Text("Attend")
+                            .font(.coDisplay(30, weight: .semibold))
+                            .foregroundColor(.coInk)
+                            .padding(.top, 8)
 
-                    liveNowSection
-                    startingSoonSection
-                    tomorrowSection
+                        liveNowSection
+                        startingSoonSection
+                        tomorrowSection
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 90)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 90)
             }
+            .navigationBarHidden(true)
         }
     }
 
@@ -35,32 +38,37 @@ struct AttendView: View {
 
     private var liveHeroCard: some View {
         let service = MockData.liveNow
-        return COCard(padding: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    COPlaceholderBlock(icon: .church, cornerRadius: 0, iconSize: 46)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 190)
-                    liveBadge
-                        .padding(12)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(service.church.name)
-                        .font(.coUI(16, weight: .semibold))
-                        .foregroundColor(.coInk)
-                    HStack {
-                        Text(service.church.city)
-                            .font(.coUI(12))
-                            .foregroundColor(.coInkTertiary)
-                        Spacer()
-                        Text(viewerLabel(service.church.viewers))
-                            .font(.coUI(11))
-                            .foregroundColor(.coInkTertiary)
+        return NavigationLink {
+            ServiceDetailView(service: service)
+        } label: {
+            COCard(padding: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        COPlaceholderBlock(icon: .church, cornerRadius: 0, iconSize: 46)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 190)
+                        liveBadge
+                            .padding(12)
                     }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(service.church.name)
+                            .font(.coUI(16, weight: .semibold))
+                            .foregroundColor(.coInk)
+                        HStack {
+                            Text(service.church.city)
+                                .font(.coUI(12))
+                                .foregroundColor(.coInkTertiary)
+                            Spacer()
+                            Text(viewerLabel(service.church.viewers))
+                                .font(.coUI(11))
+                                .foregroundColor(.coInkTertiary)
+                        }
+                    }
+                    .padding(16)
                 }
-                .padding(16)
             }
         }
+        .buttonStyle(.plain)
     }
 
     private var liveBadge: some View {
@@ -127,23 +135,29 @@ fileprivate struct ServiceRow: View {
     let rightLabel: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            COPlaceholderBlock(icon: .church, cornerRadius: 10, iconSize: 18)
-                .frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(service.church.name)
-                    .font(.coUI(15, weight: .medium))
-                    .foregroundColor(.coInk)
-                Text(service.church.city)
+        NavigationLink {
+            ServiceDetailView(service: service)
+        } label: {
+            HStack(spacing: 12) {
+                COPlaceholderBlock(icon: .church, cornerRadius: 10, iconSize: 18)
+                    .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(service.church.name)
+                        .font(.coUI(15, weight: .medium))
+                        .foregroundColor(.coInk)
+                    Text(service.church.city)
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkTertiary)
+                }
+                Spacer()
+                Text(rightLabel)
                     .font(.coUI(12))
-                    .foregroundColor(.coInkTertiary)
+                    .foregroundColor(.coInkSecondary)
             }
-            Spacer()
-            Text(rightLabel)
-                .font(.coUI(12))
-                .foregroundColor(.coInkSecondary)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 12)
+        .buttonStyle(.plain)
     }
 }
 

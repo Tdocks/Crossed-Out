@@ -37,6 +37,7 @@ struct RootView: View {
             case "explore": NavigationStack { ExploreView() }
             case "churches": NavigationStack { ChurchFinderView() }
             case "give": NavigationStack { GiveView() }
+            case "settings": NavigationStack { SettingsView() }
             default: OnboardingView()
             }
         }

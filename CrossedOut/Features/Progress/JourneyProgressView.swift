@@ -2,10 +2,33 @@ import SwiftUI
 import UIKit
 
 struct JourneyProgressView: View {
-    @State private var workingThrough: [WorkingItem] = MockData.streak.workingThrough
+    @EnvironmentObject private var appState: AppState
 
-    private let streak = MockData.streak
-    private let weekRhythm: [CGFloat] = [0.35, 0.55, 0.9, 0.5, 1.0, 0.7, 0.3]
+    private var workingThrough: [WorkingItem] { appState.workingItems }
+    private var streak: StreakState { appState.streak }
+
+    private static let rhythmKinds: [(key: String, label: String)] = [
+        ("scripture", "Scripture"),
+        ("prayer", "Prayer"),
+        ("reflection", "Reflection"),
+        ("community", "Community"),
+        ("encouragement", "Encouragement"),
+        ("devotional", "Devotional")
+    ]
+
+    private var weekRhythmValues: [CGFloat] {
+        Self.rhythmKinds.map { entry in
+            let count = appState.weekRhythm[entry.key] ?? 0
+            return min(1.0, CGFloat(count) / 7.0)
+        }
+    }
+
+    private var activeRhythmBreakdown: [(key: String, label: String, count: Int)] {
+        Self.rhythmKinds.compactMap { entry in
+            let count = appState.weekRhythm[entry.key] ?? 0
+            return count > 0 ? (entry.key, entry.label, count) : nil
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -25,6 +48,8 @@ struct JourneyProgressView: View {
                 workingThroughSection
 
                 thisWeekCard
+
+                rhythmBreakdown
 
                 Text("Your progress is still here. Today is another opportunity.")
                     .font(.coUIItalic(12))
@@ -111,9 +136,7 @@ struct JourneyProgressView: View {
         guard workingThrough.indices.contains(index), !workingThrough[index].crossed else { return }
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        withAnimation(.easeOut(duration: 0.35)) {
-            workingThrough[index].crossed = true
-        }
+        appState.crossWorkingItem(id: workingThrough[index].id)
     }
 
     private var thisWeekCard: some View {
@@ -130,12 +153,32 @@ struct JourneyProgressView: View {
                         .foregroundColor(.coInk)
                 }
                 Spacer()
-                RhythmBars(values: weekRhythm)
+                RhythmBars(values: weekRhythmValues)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var rhythmBreakdown: some View {
+        let active = activeRhythmBreakdown
+        if !active.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(active, id: \.key) { entry in
+                    HStack(spacing: 10) {
+                        COIcon(.checkCircle, size: 14, color: .coOlive)
+                        Text("\(entry.label) \(entry.count) of 7")
+                            .font(.coUI(13))
+                            .foregroundColor(.coInkSecondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
         }
     }
 }
 
 #Preview {
     JourneyProgressView()
+        .environmentObject(AppState())
 }

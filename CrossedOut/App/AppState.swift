@@ -16,6 +16,8 @@ final class AppState: ObservableObject {
     @Published var services: [LiveService] = []
     @Published var projects: [GiveProject] = []
     @Published var isSupabaseLive = false
+    @Published var workingItems: [WorkingItem] = MockData.streak.workingThrough
+    @Published var weekRhythm: [String: Int] = [:]
 
     // MARK: - Persistence Keys
 
@@ -25,6 +27,7 @@ final class AppState: ObservableObject {
         static let firstOpenDate = "co.firstOpenDate"
         static let lastCheckInDate = "co.lastCheckInDate"
         static let todayMoodPrefix = "co.todayMood."
+        static let seededWorkingItems = "co.seededWorkingItems"
     }
 
     // MARK: - Init
@@ -100,6 +103,36 @@ final class AppState: ObservableObject {
 
             guard signedIn else { return }
 
+            weekRhythm = (try? await service.fetchWeekCompletions()) ?? [:]
+
+            // Streak read-back: server values win for counters, local week view kept.
+            if let remote = try? await service.fetchStreak().flatMap({ $0 }) {
+                streak = StreakState(
+                    current: max(remote.current, streak.current),
+                    longest: max(remote.longest, streak.longest),
+                    graceUsed: remote.graceUsed,
+                    graceTotal: remote.graceTotal,
+                    weekStates: streak.weekStates,
+                    weekWithGodDays: streak.weekWithGodDays,
+                    weekWithGodTotal: streak.weekWithGodTotal,
+                    workingThrough: streak.workingThrough
+                )
+            }
+
+            // Working items: seed once from local defaults, then read back.
+            if let items = try? await service.fetchWorkingItems() {
+                if items.isEmpty, hasOnboarded,
+                   !UserDefaults.standard.bool(forKey: DefaultsKey.seededWorkingItems) {
+                    UserDefaults.standard.set(true, forKey: DefaultsKey.seededWorkingItems)
+                    await service.seedWorkingItems(workingItems.map(\.text))
+                    if let seeded = try? await service.fetchWorkingItems(), !seeded.isEmpty {
+                        workingItems = seeded
+                    }
+                } else if !items.isEmpty {
+                    workingItems = items
+                }
+            }
+
             if let remote = try? await service.fetchProfile() {
                 profile = UserProfile(
                     id: profile.id,
@@ -169,6 +202,7 @@ final class AppState: ObservableObject {
         Task {
             await SupabaseService.shared.saveCheckIn(mood: mood.rawValue, note: nil)
             await SupabaseService.shared.touchStreak()
+            await SupabaseService.shared.recordCompletion(kind: "scripture")
         }
     }
 
@@ -211,6 +245,61 @@ final class AppState: ObservableObject {
         profile = newProfile
         hasOnboarded = true
         persistHasOnboarded()
+        persistProfile()
+        Task {
+            await SupabaseService.shared.upsertProfile(
+                firstName: newProfile.firstName,
+                need: newProfile.need,
+                translation: newProfile.translation,
+                dayNumber: newProfile.dayNumber,
+                focusAreas: newProfile.focusAreas
+            )
+        }
+    }
+
+    // MARK: - Auth
+
+    /// Called after a successful sign-in from AuthSheet: marks onboarding
+    /// complete and re-runs bootstrap so remote data merges in.
+    func refreshAfterAuth() {
+        hasOnboarded = true
+        persistHasOnboarded()
+        Task { await bootstrap() }
+    }
+
+    /// Signs out and returns the app to onboarding.
+    func signOutAndReset() {
+        Task { await SupabaseService.shared.signOut() }
+        hasOnboarded = false
+        persistHasOnboarded()
+    }
+
+    /// Crosses out a working item locally and syncs to Supabase.
+    func crossWorkingItem(id: UUID) {
+        guard let idx = workingItems.firstIndex(where: { $0.id == id }),
+              !workingItems[idx].crossed else { return }
+        withAnimation(.easeOut(duration: 0.35)) {
+            workingItems[idx].crossed = true
+        }
+        let itemID = workingItems[idx].id
+        Task { await SupabaseService.shared.setWorkingItemCrossed(id: itemID, crossed: true) }
+    }
+
+    // MARK: - Profile Updates
+
+    /// Updates only the fields provided, persists locally, and syncs to
+    /// Supabase. Used by SettingsView for both the profile "Save" action and
+    /// standalone preference changes (like translation).
+    func updateProfile(firstName: String? = nil, need: String? = nil, focus: [String]? = nil, translation: String? = nil) {
+        let newProfile = UserProfile(
+            id: profile.id,
+            firstName: firstName ?? profile.firstName,
+            focusAreas: focus ?? profile.focusAreas,
+            need: need ?? profile.need,
+            translation: translation ?? profile.translation,
+            dayNumber: profile.dayNumber
+        )
+        profile = newProfile
         persistProfile()
         Task {
             await SupabaseService.shared.upsertProfile(

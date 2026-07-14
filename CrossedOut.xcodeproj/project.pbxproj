@@ -11,6 +11,7 @@
 		1429F8BC18D96F26E8EBED59 /* CrossedOutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8817ED9B69880386FF44CCF4 /* CrossedOutApp.swift */; };
 		181037C41BB02857ECE062B5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583F1B69EE280361D4A18B79 /* Components.swift */; };
 		1E843D70D7E9F8C56B6A55EF /* Inter-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 314A2153E9CC5E81022CB9EF /* Inter-Italic.ttf */; };
+		20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301F62AED89C820CD3369957 /* ServiceDetailView.swift */; };
 		20D200C1A012404A338C0F35 /* TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFA439125C7FB6B3DC9361B /* TabBar.swift */; };
 		29C3C08C042DBD4D2AFC7567 /* JourneyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8418F244D418C4D90CD398C /* JourneyProgressView.swift */; };
 		3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */; };
@@ -23,9 +24,12 @@
 		66535BF74709A253E785EAE7 /* Inter.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 92844B9A5A8AE42B2D505A3D /* Inter.ttf */; };
 		67FD6C93898D75B938F6D671 /* CommunityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA5558BACBD522E5204A0D58 /* CommunityView.swift */; };
 		73D4E5549A3BE2E97C769F17 /* PlayfairDisplay-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 6D009328117B445BCDD40BDE /* PlayfairDisplay-Italic.ttf */; };
+		82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E416CE180C9BE0CF3CED42AF /* SettingsView.swift */; };
 		83BB1E5EFFEE74E103313217 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68BF5D32AC54F55EEA766FA /* ExploreView.swift */; };
 		8C4860A0B6ADAF1F7BA2D705 /* BibleReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE4842808F2C29861BB2A2A3 /* BibleReaderView.swift */; };
+		9912F6A302F8E2637C5311F1 /* ReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */; };
 		9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01608714F91323B05EDC5DFF /* RootView.swift */; };
+		B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */; };
 		BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF74E32355BCCC414036E57 /* AppState.swift */; };
 		C68DBCF8C4D5107C748E51CD /* PlayfairDisplay-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */; };
 		C7ACBE3733A8F4465DCE840B /* BridgeShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244B30446FDFB2BFF005543F /* BridgeShareView.swift */; };
@@ -44,6 +48,7 @@
 		0D4A83A506B6EF6EB332363A /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
 		19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CrossedOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		244B30446FDFB2BFF005543F /* BridgeShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeShareView.swift; sourceTree = "<group>"; };
+		301F62AED89C820CD3369957 /* ServiceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceDetailView.swift; sourceTree = "<group>"; };
 		314A2153E9CC5E81022CB9EF /* Inter-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Italic.ttf"; sourceTree = "<group>"; };
 		3CFA439125C7FB6B3DC9361B /* TabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBar.swift; sourceTree = "<group>"; };
 		4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlayfairDisplay-Regular.ttf"; sourceTree = "<group>"; };
@@ -63,6 +68,9 @@
 		CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchFinderView.swift; sourceTree = "<group>"; };
 		D4C2068096DEA50273F324B8 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D722B64EEA03E7C1D5D3586D /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSheet.swift; sourceTree = "<group>"; };
+		E416CE180C9BE0CF3CED42AF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderService.swift; sourceTree = "<group>"; };
 		E68BF5D32AC54F55EEA766FA /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
 		EA5558BACBD522E5204A0D58 /* CommunityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityView.swift; sourceTree = "<group>"; };
 		EE4842808F2C29861BB2A2A3 /* BibleReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleReaderView.swift; sourceTree = "<group>"; };
@@ -145,6 +153,7 @@
 		794556B9E9A6682BF74A1C63 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
+				DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */,
 				D4C2068096DEA50273F324B8 /* OnboardingView.swift */,
 			);
 			path = Onboarding;
@@ -204,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				C6045EA44191338D99C53763 /* MockData.swift */,
+				E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */,
 				F7ADFEC8C7333827E1855842 /* SupabaseService.swift */,
 			);
 			path = Services;
@@ -224,6 +234,7 @@
 			isa = PBXGroup;
 			children = (
 				4D763F517ED1ACDD00971A01 /* AttendView.swift */,
+				301F62AED89C820CD3369957 /* ServiceDetailView.swift */,
 			);
 			path = Attend;
 			sourceTree = "<group>";
@@ -283,6 +294,7 @@
 			isa = PBXGroup;
 			children = (
 				7F5E91BE154B378075E6F78E /* MoreHubView.swift */,
+				E416CE180C9BE0CF3CED42AF /* SettingsView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -369,6 +381,7 @@
 			files = (
 				BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */,
 				53CF5D584110140D5EC53180 /* AttendView.swift in Sources */,
+				B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */,
 				8C4860A0B6ADAF1F7BA2D705 /* BibleReaderView.swift in Sources */,
 				C7ACBE3733A8F4465DCE840B /* BridgeShareView.swift in Sources */,
 				3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */,
@@ -384,7 +397,10 @@
 				FD06D0F71A43E415BC791A96 /* Models.swift in Sources */,
 				5D7136122054C197E5474FD5 /* MoreHubView.swift in Sources */,
 				D7AE2345B38CF7BAC7199185 /* OnboardingView.swift in Sources */,
+				9912F6A302F8E2637C5311F1 /* ReminderService.swift in Sources */,
 				9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */,
+				20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */,
+				82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */,
 				F82E556AE2C8E6D2E11DD008 /* SupabaseService.swift in Sources */,
 				20D200C1A012404A338C0F35 /* TabBar.swift in Sources */,
 				609D7C80470BE9C788E18390 /* Theme.swift in Sources */,

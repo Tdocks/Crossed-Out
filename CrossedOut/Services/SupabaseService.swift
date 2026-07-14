@@ -768,3 +768,372 @@ extension SupabaseService {
         return text
     }
 }
+
+// MARK: - Auth
+
+extension SupabaseService {
+    /// Email/password sign-up. If the current session is anonymous, this
+    /// LINKS the anonymous user to the new email/password (preserving all
+    /// existing data) via `auth.update(user:)`. Otherwise it performs a
+    /// fresh `auth.signUp(email:password:)`.
+    func signUp(email: String, password: String) async throws {
+        if isAnonymous {
+            _ = try await client.auth.update(user: UserAttributes(email: email, password: password))
+        } else {
+            _ = try await client.auth.signUp(email: email, password: password)
+        }
+    }
+
+    /// Signs in an existing user with email/password.
+    func signIn(email: String, password: String) async throws {
+        _ = try await client.auth.signIn(email: email, password: password)
+    }
+
+    /// Best-effort sign-out; never throws.
+    func signOut() async {
+        do {
+            try await client.auth.signOut()
+        } catch {
+            print("SupabaseService: signOut failed: \(error)")
+        }
+    }
+
+    /// The signed-in user's email, or nil if there is none (e.g. anonymous
+    /// or not yet linked to an email).
+    var currentUserEmail: String? {
+        let email = client.auth.currentSession?.user.email
+        return (email?.isEmpty ?? true) ? nil : email
+    }
+
+    /// True if the current session belongs to an anonymous user, or if
+    /// there is no session at all.
+    var isAnonymous: Bool {
+        client.auth.currentSession?.user.isAnonymous ?? true
+    }
+}
+
+// MARK: - Streak & Working Items
+
+extension SupabaseService {
+    /// Fetches the current user's streak row, or nil if unauthenticated /
+    /// no row exists yet.
+    func fetchStreak() async throws -> (current: Int, longest: Int, graceUsed: Int, graceTotal: Int)? {
+        guard let uid = currentUserID else { return nil }
+        let rows: [StreakDTO] = try await client
+            .from("streaks")
+            .select()
+            .eq("user_id", value: uid)
+            .limit(1)
+            .execute()
+            .value
+        guard let row = rows.first else { return nil }
+        return (current: row.current, longest: row.longest, graceUsed: row.graceUsed, graceTotal: row.graceTotal)
+    }
+}
+
+private struct WorkingItemDTO: Codable {
+    let id: UUID
+    let text: String
+    let crossed: Bool
+    let position: Int
+
+    func toModel() -> WorkingItem {
+        WorkingItem(id: id, text: text, crossed: crossed)
+    }
+}
+
+extension SupabaseService {
+    /// Fetches the current user's working-through items, ordered by position.
+    /// Returns an empty array if unauthenticated.
+    func fetchWorkingItems() async throws -> [WorkingItem] {
+        guard let uid = currentUserID else { return [] }
+        let dtos: [WorkingItemDTO] = try await client
+            .from("working_items")
+            .select()
+            .eq("user_id", value: uid)
+            .order("position", ascending: true)
+            .execute()
+            .value
+        return dtos.map { $0.toModel() }
+    }
+
+    private struct WorkingItemInsert: Encodable {
+        let user_id: UUID
+        let text: String
+        let position: Int
+    }
+
+    /// Best-effort seed of the current user's working-through list with the
+    /// given texts at positions 0..<n. Callers are responsible for ensuring
+    /// this only runs once (e.g. guarding on an existing empty list).
+    func seedWorkingItems(_ texts: [String]) async {
+        guard let uid = currentUserID, !texts.isEmpty else { return }
+        let payload = texts.enumerated().map { index, text in
+            WorkingItemInsert(user_id: uid, text: text, position: index)
+        }
+        do {
+            try await client.from("working_items").insert(payload).execute()
+        } catch {
+            print("SupabaseService: seedWorkingItems failed: \(error)")
+        }
+    }
+}
+
+// MARK: - Notes & Bookmarks
+
+struct VerseNote: Identifiable, Hashable {
+    let id: UUID
+    let verse: Int
+    let note: String
+}
+
+private struct VerseNoteDTO: Codable {
+    let id: UUID
+    let verse: Int
+    let note: String
+
+    func toModel() -> VerseNote {
+        VerseNote(id: id, verse: verse, note: note)
+    }
+}
+
+struct VerseBookmark: Identifiable, Hashable {
+    let id: UUID
+    let book: String
+    let chapter: Int
+    let verse: Int?
+}
+
+private struct VerseBookmarkDTO: Codable {
+    let id: UUID
+    let book: String
+    let chapter: Int
+    let verse: Int?
+
+    func toModel() -> VerseBookmark {
+        VerseBookmark(id: id, book: book, chapter: chapter, verse: verse)
+    }
+}
+
+extension SupabaseService {
+    /// Fetches the current user's notes for a given book/chapter, ordered by verse.
+    func fetchNotes(book: String, chapter: Int) async throws -> [VerseNote] {
+        guard let uid = currentUserID else { return [] }
+        let dtos: [VerseNoteDTO] = try await client
+            .from("user_notes")
+            .select("id,verse,note")
+            .eq("user_id", value: uid)
+            .eq("book", value: book)
+            .eq("chapter", value: chapter)
+            .order("verse", ascending: true)
+            .execute()
+            .value
+        return dtos.map { $0.toModel() }
+    }
+
+    private struct NoteInsert: Encodable {
+        let user_id: UUID
+        let book: String
+        let chapter: Int
+        let verse: Int
+        let note: String
+    }
+
+    /// Best-effort insert of a new note for the current user.
+    func saveNote(book: String, chapter: Int, verse: Int, note: String) async {
+        guard let uid = currentUserID else { return }
+        let payload = NoteInsert(user_id: uid, book: book, chapter: chapter, verse: verse, note: note)
+        do {
+            try await client.from("user_notes").insert(payload).execute()
+        } catch {
+            print("SupabaseService: saveNote failed: \(error)")
+        }
+    }
+
+    /// Best-effort delete of a note by id, scoped to the current user.
+    func deleteNote(id: UUID) async {
+        guard let uid = currentUserID else { return }
+        do {
+            try await client
+                .from("user_notes")
+                .delete()
+                .eq("id", value: id)
+                .eq("user_id", value: uid)
+                .execute()
+        } catch {
+            print("SupabaseService: deleteNote failed: \(error)")
+        }
+    }
+}
+
+extension SupabaseService {
+    /// Fetches all bookmarks for the current user.
+    func fetchBookmarks() async throws -> [VerseBookmark] {
+        guard let uid = currentUserID else { return [] }
+        let dtos: [VerseBookmarkDTO] = try await client
+            .from("user_bookmarks")
+            .select("id,book,chapter,verse")
+            .eq("user_id", value: uid)
+            .execute()
+            .value
+        return dtos.map { $0.toModel() }
+    }
+
+    private struct BookmarkInsert: Encodable {
+        let user_id: UUID
+        let book: String
+        let chapter: Int
+        let verse: Int?
+    }
+
+    /// Best-effort set/unset of a bookmark for book/chapter/(optional)verse.
+    /// Deletes any existing matching row first (NULL-safe), then inserts a
+    /// fresh row when `on` is true.
+    func setBookmark(book: String, chapter: Int, verse: Int?, on: Bool) async {
+        guard let uid = currentUserID else { return }
+        do {
+            try await deleteBookmarkRows(uid: uid, book: book, chapter: chapter, verse: verse)
+            if on {
+                let payload = BookmarkInsert(user_id: uid, book: book, chapter: chapter, verse: verse)
+                try await client.from("user_bookmarks").insert(payload).execute()
+            }
+        } catch {
+            print("SupabaseService: setBookmark failed: \(error)")
+        }
+    }
+
+    private func deleteBookmarkRows(uid: UUID, book: String, chapter: Int, verse: Int?) async throws {
+        if let verse {
+            try await client
+                .from("user_bookmarks")
+                .delete()
+                .eq("user_id", value: uid)
+                .eq("book", value: book)
+                .eq("chapter", value: chapter)
+                .eq("verse", value: verse)
+                .execute()
+        } else {
+            try await client
+                .from("user_bookmarks")
+                .delete()
+                .eq("user_id", value: uid)
+                .eq("book", value: book)
+                .eq("chapter", value: chapter)
+                .is("verse", value: nil)
+                .execute()
+        }
+    }
+}
+
+// MARK: - Churches & Give
+
+extension SupabaseService {
+    private struct SavedChurchRowDTO: Codable { let church_id: UUID }
+
+    /// IDs of churches the current user has saved. Empty if unauthenticated.
+    func fetchSavedChurchIDs() async throws -> Set<UUID> {
+        guard let uid = currentUserID else { return [] }
+        let rows: [SavedChurchRowDTO] = try await client
+            .from("saved_churches")
+            .select("church_id")
+            .eq("user_id", value: uid)
+            .execute()
+            .value
+        return Set(rows.map { $0.church_id })
+    }
+
+    private struct SavedChurchInsert: Encodable {
+        let user_id: UUID
+        let church_id: UUID
+    }
+
+    /// Best-effort save/unsave of a church for the current user.
+    func setChurchSaved(churchID: UUID, saved: Bool) async {
+        guard let uid = currentUserID else { return }
+        do {
+            if saved {
+                let payload = SavedChurchInsert(user_id: uid, church_id: churchID)
+                try await client
+                    .from("saved_churches")
+                    .upsert(payload, onConflict: "user_id,church_id", ignoreDuplicates: true)
+                    .execute()
+            } else {
+                try await client
+                    .from("saved_churches")
+                    .delete()
+                    .eq("user_id", value: uid)
+                    .eq("church_id", value: churchID)
+                    .execute()
+            }
+        } catch {
+            print("SupabaseService: setChurchSaved failed: \(error)")
+        }
+    }
+
+    private struct GiveIntentInsert: Encodable {
+        let user_id: UUID
+        let project_id: UUID
+        let amount: Double
+    }
+
+    /// Best-effort recording of a give intent (not an actual payment charge).
+    func recordGiveIntent(projectID: UUID, amount: Double) async {
+        guard let uid = currentUserID else { return }
+        let payload = GiveIntentInsert(user_id: uid, project_id: projectID, amount: amount)
+        do {
+            try await client.from("give_intents").insert(payload).execute()
+        } catch {
+            print("SupabaseService: recordGiveIntent failed: \(error)")
+        }
+    }
+}
+
+// MARK: - Rhythm (daily completions)
+
+extension SupabaseService {
+    private struct CompletionUpsert: Encodable {
+        let user_id: UUID
+        let day: String
+        let kind: String
+    }
+
+    /// Best-effort upsert of today's completion for the given kind
+    /// ('scripture', 'prayer', 'reflection', 'community', 'encouragement',
+    /// 'devotional'). Duplicate same-day/kind rows are ignored.
+    func recordCompletion(kind: String) async {
+        guard let uid = currentUserID else { return }
+        let payload = CompletionUpsert(user_id: uid, day: Self.dayString(Date()), kind: kind)
+        do {
+            try await client
+                .from("daily_completions")
+                .upsert(payload, onConflict: "user_id,day,kind", ignoreDuplicates: true)
+                .execute()
+        } catch {
+            print("SupabaseService: recordCompletion failed: \(error)")
+        }
+    }
+
+    private struct CompletionRowDTO: Codable {
+        let day: String
+        let kind: String
+    }
+
+    /// Counts of completions per kind over the last 7 days (including today),
+    /// aggregated client-side. Empty if unauthenticated.
+    func fetchWeekCompletions() async throws -> [String: Int] {
+        guard let uid = currentUserID else { return [:] }
+        let sevenDaysAgo = Self.dayString(Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date())
+        let rows: [CompletionRowDTO] = try await client
+            .from("daily_completions")
+            .select("day,kind")
+            .eq("user_id", value: uid)
+            .gte("day", value: sevenDaysAgo)
+            .execute()
+            .value
+        var counts: [String: Int] = [:]
+        for row in rows {
+            counts[row.kind, default: 0] += 1
+        }
+        return counts
+    }
+}

@@ -9,6 +9,8 @@ struct OnboardingView: View {
     @State private var selectedFocus: Set<String> = []
     @State private var needText: String = ""
     @State private var selectedMood: Mood?
+    @State private var showSignIn = false
+    @State private var showCreateAccount = false
 
     var body: some View {
         ZStack {
@@ -18,6 +20,22 @@ struct OnboardingView: View {
             case .focus: focusStep
             case .need: needStep
             }
+        }
+        .sheet(isPresented: $showSignIn) {
+            AuthSheet(mode: .signIn) {
+                appState.refreshAfterAuth()
+            }
+        }
+        .sheet(isPresented: $showCreateAccount, onDismiss: {
+            Task {
+                await appState.completeOnboarding(
+                    name: MockData.profile.firstName,
+                    focus: Array(selectedFocus),
+                    need: needText.isEmpty ? MockData.profile.need : needText
+                )
+            }
+        }) {
+            AuthSheet(mode: .createAccount)
         }
         .animation(.easeInOut(duration: 0.25), value: step)
     }
@@ -48,9 +66,7 @@ struct OnboardingView: View {
             VStack(spacing: 6) {
                 COPrimaryButton(title: "Get Started") { step = .focus }
                 COSecondaryButton(title: "I already have an account") {
-                    Task { await appState.completeOnboarding(name: MockData.profile.firstName,
-                                                             focus: MockData.profile.focusAreas,
-                                                             need: MockData.profile.need) }
+                    showSignIn = true
                 }
             }
             .padding(.horizontal, 24)
@@ -147,13 +163,9 @@ struct OnboardingView: View {
             }
 
             COPrimaryButton(title: "Begin") {
-                Task {
-                    await appState.completeOnboarding(
-                        name: MockData.profile.firstName,
-                        focus: Array(selectedFocus),
-                        need: needText.isEmpty ? MockData.profile.need : needText
-                    )
-                }
+                // Offer account creation first; onboarding completes when
+                // the sheet dismisses (either path), see sheet onDismiss.
+                showCreateAccount = true
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 20)

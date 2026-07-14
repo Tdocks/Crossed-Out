@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import UIKit
 
 // MARK: - Give Tab
 
@@ -12,7 +13,12 @@ private enum GiveTab: String, CaseIterable, Hashable {
 
 struct GiveView: View {
     @State private var selectedTab: GiveTab = .give
-    @State private var showGiveSheet = false
+    @State private var giveSheetProject: GiveProject?
+
+    private let generalFundProject = GiveProject(
+        title: "General Fund", org: "Wherever it's needed most",
+        raised: 0, goal: 0, dateRange: nil
+    )
 
     var body: some View {
         ZStack {
@@ -32,8 +38,8 @@ struct GiveView: View {
                 .padding(.bottom, 90)
             }
         }
-        .sheet(isPresented: $showGiveSheet) {
-            GiveAmountSheet()
+        .sheet(item: $giveSheetProject) { project in
+            GiveAmountSheet(project: project)
         }
     }
 
@@ -85,7 +91,7 @@ struct GiveView: View {
                     .font(.coDisplay(24, weight: .semibold))
                     .foregroundColor(.white)
                 CompactPrimaryButton(title: "Give Now", width: 120) {
-                    showGiveSheet = true
+                    giveSheetProject = generalFundProject
                 }
             }
             .padding(16)
@@ -100,7 +106,9 @@ struct GiveView: View {
             COSectionHeader(title: "Active Projects")
             VStack(spacing: 12) {
                 ForEach(MockData.giveProjects) { project in
-                    ProjectCard(project: project)
+                    ProjectCard(project: project) {
+                        giveSheetProject = project
+                    }
                 }
             }
         }
@@ -111,38 +119,43 @@ struct GiveView: View {
 
 fileprivate struct ProjectCard: View {
     let project: GiveProject
+    let action: () -> Void
 
     private var tint: Color {
         project.dateRange != nil ? .coGold : .coCrossRed
     }
 
     var body: some View {
-        COCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    COPlaceholderBlock(icon: .give, cornerRadius: 10, iconSize: 18)
-                        .frame(width: 40, height: 40)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(project.title)
-                            .font(.coUI(15, weight: .semibold))
+        Button(action: action) {
+            COCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        COPlaceholderBlock(icon: .give, cornerRadius: 10, iconSize: 18)
+                            .frame(width: 40, height: 40)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(project.title)
+                                .font(.coUI(15, weight: .semibold))
+                                .foregroundColor(.coInk)
+                            Text(project.org)
+                                .font(.coUI(12))
+                                .foregroundColor(.coInkTertiary)
+                        }
+                        Spacer()
+                        Text("\(formatCurrency(project.raised)) of \(formatCurrency(project.goal))")
+                            .font(.coUI(12, weight: .semibold))
                             .foregroundColor(.coInk)
-                        Text(project.org)
-                            .font(.coUI(12))
+                        COIcon(.chevronRight, size: 14, color: .coInkTertiary)
+                    }
+                    COProgressBar(value: project.progress, tint: tint)
+                    if let dateRange = project.dateRange {
+                        Text(dateRange)
+                            .font(.coUI(11))
                             .foregroundColor(.coInkTertiary)
                     }
-                    Spacer()
-                    Text("\(formatCurrency(project.raised)) of \(formatCurrency(project.goal))")
-                        .font(.coUI(12, weight: .semibold))
-                        .foregroundColor(.coInk)
-                }
-                COProgressBar(value: project.progress, tint: tint)
-                if let dateRange = project.dateRange {
-                    Text(dateRange)
-                        .font(.coUI(11))
-                        .foregroundColor(.coInkTertiary)
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     private func formatCurrency(_ value: Int) -> String {
@@ -157,48 +170,121 @@ fileprivate struct ProjectCard: View {
 // MARK: - Give Amount Sheet
 
 fileprivate struct GiveAmountSheet: View {
+    let project: GiveProject
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedAmount: Int? = 25
     @State private var customAmount: String = ""
+    @State private var didSucceed = false
 
     private let amounts = [10, 25, 50, 100]
+
+    private var amountValue: Double? {
+        if let selectedAmount { return Double(selectedAmount) }
+        if let custom = Double(customAmount), custom > 0 { return custom }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.coPaper.ignoresSafeArea()
-                VStack(spacing: 24) {
-                    HStack(spacing: 10) {
-                        ForEach(amounts, id: \.self) { amount in
-                            COChip(text: "$\(amount)", selected: selectedAmount == amount) {
-                                selectedAmount = amount
-                                customAmount = ""
-                            }
-                        }
-                    }
-                    TextField("Custom amount", text: $customAmount)
-                        .keyboardType(.numberPad)
-                        .font(.coUI(15))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(Color.coCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(Color.coDivider, lineWidth: 1)
-                        )
-                        .onChange(of: customAmount) { _, _ in
-                            selectedAmount = nil
-                        }
-                    Spacer()
-                    COPrimaryButton(title: "Continue") {
-                        dismiss()
-                    }
+                if didSucceed {
+                    successState
+                } else {
+                    formState
                 }
-                .padding(20)
             }
             .navigationTitle("Give Now")
             .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private var formState: some View {
+        VStack(spacing: 24) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(project.title)
+                    .font(.coDisplay(20, weight: .semibold))
+                    .foregroundColor(.coInk)
+                Text(project.org)
+                    .font(.coUI(13))
+                    .foregroundColor(.coInkTertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 10) {
+                ForEach(amounts, id: \.self) { amount in
+                    COChip(text: "$\(amount)", selected: selectedAmount == amount) {
+                        selectedAmount = amount
+                        customAmount = ""
+                    }
+                }
+            }
+            TextField("Other amount", text: $customAmount)
+                .keyboardType(.numberPad)
+                .font(.coUI(15))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.coCard)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.coDivider, lineWidth: 1)
+                )
+                .onChange(of: customAmount) { _, newValue in
+                    if !newValue.isEmpty { selectedAmount = nil }
+                }
+            Spacer()
+            COPrimaryButton(title: giveButtonTitle) {
+                submitGive()
+            }
+        }
+        .padding(20)
+    }
+
+    private var giveButtonTitle: String {
+        guard let amountValue, amountValue > 0 else { return "Give" }
+        return "Give \(formattedAmount(amountValue))"
+    }
+
+    private var successState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            COIcon(.checkCircle, size: 40, color: .coGold)
+            Text("Thank you.")
+                .font(.coDisplay(22, weight: .semibold))
+                .foregroundColor(.coInk)
+            Text("Your gift intent was recorded. Payment processing arrives in a future update.")
+                .font(.coUI(13))
+                .foregroundColor(.coInkSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 28)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func formattedAmount(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        formatter.maximumFractionDigits = value == value.rounded() ? 0 : 2
+        let number = formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        return "$\(number)"
+    }
+
+    private func submitGive() {
+        guard let amountValue, amountValue > 0, !didSucceed else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        let projectID = project.id
+        Task {
+            await SupabaseService.shared.recordGiveIntent(projectID: projectID, amount: amountValue)
+        }
+        withAnimation(.easeOut(duration: 0.25)) {
+            didSucceed = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            dismiss()
         }
     }
 }

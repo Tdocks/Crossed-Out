@@ -46,6 +46,10 @@ struct BibleReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showChapters = false
     @State private var highlighted: Set<Int> = []
+    @State private var notes: [Int: VerseNote] = [:]
+    @State private var bookmarked: Set<Int> = []
+    @State private var noteSheetVerse: BibleVerse? = nil
+    @State private var showNotesList = false
 
     @State private var currentTranslation: BibleTranslation = .bsb
     @State private var currentBook: String = "John"
@@ -83,6 +87,29 @@ struct BibleReaderView: View {
         .sheet(isPresented: $showChapters) {
             ChapterPickerSheet(currentBook: currentBook, currentChapter: currentChapterNum) { book, chapterNum in
                 selectChapter(book: book, chapterNum: chapterNum)
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $noteSheetVerse) { verse in
+            NoteSheet(
+                book: currentBook,
+                chapterNum: currentChapterNum,
+                verse: verse,
+                existingNote: notes[verse.number],
+                onSave: { text in
+                    Task { await saveNoteAction(verse: verse, text: text) }
+                },
+                onDelete: {
+                    Task { await deleteNoteAction(verse: verse) }
+                }
+            )
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showNotesList) {
+            NotesListSheet(book: currentBook, chapterNum: currentChapterNum, notes: Array(notes.values)) { verseNumber in
+                if let verse = chapterData.verses.first(where: { $0.number == verseNumber }) {
+                    noteSheetVerse = verse
+                }
             }
             .presentationDetents([.medium, .large])
         }
@@ -163,7 +190,32 @@ struct BibleReaderView: View {
                     verseParagraph(verse)
                 }
             }
+            chapterNavRow
         }
+    }
+
+    private var chapterNavRow: some View {
+        let maxChapter = BibleBooks.chapterCounts[currentBook] ?? 1
+        return HStack {
+            if currentChapterNum > 1 {
+                Button { goToPreviousChapter() } label: {
+                    Text("← Previous")
+                        .font(.coUI(13))
+                        .foregroundColor(.coInkSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            if currentChapterNum < maxChapter {
+                Button { goToNextChapter() } label: {
+                    Text("Next →")
+                        .font(.coUI(13))
+                        .foregroundColor(.coInkSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 24)
     }
 
     private var sectionHeading: some View {
@@ -187,17 +239,28 @@ struct BibleReaderView: View {
     }
 
     private func verseText(_ verse: BibleVerse) -> Text {
-        Text("\(verse.number) ")
+        var line = Text("\(verse.number) ")
             .font(.coUI(11, weight: .semibold))
             .foregroundColor(.coInkTertiary)
             .baselineOffset(6)
-        + Text(verse.text)
-            .font(.coScripture(19))
-            .foregroundColor(.coInk)
+        if notes[verse.number] != nil {
+            line = line
+                + Text(Image(systemName: "note.text"))
+                    .font(.system(size: 12))
+                    .foregroundColor(.coGold)
+                    .baselineOffset(2)
+                + Text(" ")
+                    .font(.coUI(11))
+        }
+        return line
+            + Text(verse.text)
+                .font(.coScripture(19))
+                .foregroundColor(.coInk)
     }
 
     private func verseParagraph(_ verse: BibleVerse) -> some View {
         let isOn = highlighted.contains(verse.number)
+        let isBookmarked = bookmarked.contains(verse.number)
         return verseText(verse)
             .lineSpacing(9)
             .fixedSize(horizontal: false, vertical: true)
@@ -208,20 +271,35 @@ struct BibleReaderView: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(isOn ? Color.coGold.opacity(0.15) : Color.clear)
             )
-            .contentShape(Rectangle())
-            .onLongPressGesture {
-                let turningOn = !isOn
-                withAnimation(.easeOut(duration: 0.2)) {
-                    if isOn { highlighted.remove(verse.number) }
-                    else { highlighted.insert(verse.number) }
+            .overlay(alignment: .leading) {
+                if isBookmarked {
+                    Rectangle()
+                        .fill(Color.coGold)
+                        .frame(width: 3)
+                        .padding(.vertical, 2)
+                        .offset(x: -14)
                 }
-                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                let book = currentBook
-                let chapterNum = currentChapterNum
-                Task {
-                    await SupabaseService.shared.setHighlight(
-                        book: book, chapter: chapterNum, verse: verse.number, on: turningOn
-                    )
+            }
+            .contentShape(Rectangle())
+            .contextMenu {
+                Button {
+                    toggleHighlight(verse)
+                } label: {
+                    Label(isOn ? "Remove Highlight" : "Highlight", systemImage: "highlighter")
+                }
+                Button {
+                    openNoteSheet(for: verse)
+                } label: {
+                    Label("Add Note...", systemImage: "note.text")
+                }
+                Button {
+                    toggleBookmark(verse)
+                } label: {
+                    Label(isBookmarked ? "Remove Bookmark" : "Bookmark",
+                          systemImage: isBookmarked ? "bookmark.slash" : "bookmark")
+                }
+                ShareLink(item: shareText(for: verse)) {
+                    Label("Share Verse", systemImage: "square.and.arrow.up")
                 }
             }
     }
@@ -232,10 +310,10 @@ struct BibleReaderView: View {
         VStack(spacing: 0) {
             CODivider()
             HStack(spacing: 0) {
-                toolbarItem(.study, "Study")
-                toolbarItem(.note, "Notes")
-                toolbarItem(.highlight, "Highlight")
-                toolbarItem(.share, "Share")
+                toolbarItem(.study, "Study") { }
+                toolbarItem(.note, "Notes") { showNotesList = true }
+                toolbarItem(.highlight, "Highlight") { }
+                toolbarItem(.share, "Share") { }
             }
             .padding(.top, 10)
             .padding(.bottom, 6)
@@ -243,8 +321,8 @@ struct BibleReaderView: View {
         .background(Color.coPaper)
     }
 
-    private func toolbarItem(_ icon: COIconName, _ label: String) -> some View {
-        Button { } label: {
+    private func toolbarItem(_ icon: COIconName, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             VStack(spacing: 5) {
                 COIcon(icon, size: 20, color: .coInkSecondary)
                 Text(label)
@@ -263,6 +341,8 @@ struct BibleReaderView: View {
         guard translation != currentTranslation else { return }
         currentTranslation = translation
         highlighted = []
+        notes = [:]
+        bookmarked = []
         Task {
             await loadChapter(translation: translation, book: currentBook, chapterNum: currentChapterNum)
         }
@@ -272,9 +352,22 @@ struct BibleReaderView: View {
         currentBook = book
         currentChapterNum = chapterNum
         highlighted = []
+        notes = [:]
+        bookmarked = []
         Task {
             await loadChapter(translation: currentTranslation, book: book, chapterNum: chapterNum)
         }
+    }
+
+    private func goToPreviousChapter() {
+        guard currentChapterNum > 1 else { return }
+        selectChapter(book: currentBook, chapterNum: currentChapterNum - 1)
+    }
+
+    private func goToNextChapter() {
+        let maxChapter = BibleBooks.chapterCounts[currentBook] ?? 1
+        guard currentChapterNum < maxChapter else { return }
+        selectChapter(book: currentBook, chapterNum: currentChapterNum + 1)
     }
 
     private func loadChapter(translation: BibleTranslation, book: String, chapterNum: Int) async {
@@ -288,6 +381,79 @@ struct BibleReaderView: View {
         ) {
             highlighted = fetchedHighlights
         }
+        if let fetchedNotes = try? await SupabaseService.shared.fetchNotes(book: book, chapter: chapterNum) {
+            notes = Dictionary(uniqueKeysWithValues: fetchedNotes.map { ($0.verse, $0) })
+        } else {
+            notes = [:]
+        }
+        if let fetchedBookmarks = try? await SupabaseService.shared.fetchBookmarks() {
+            bookmarked = Set(
+                fetchedBookmarks
+                    .filter { $0.book == book && $0.chapter == chapterNum }
+                    .compactMap { $0.verse }
+            )
+        } else {
+            bookmarked = []
+        }
+    }
+
+    private func toggleHighlight(_ verse: BibleVerse) {
+        let isOn = highlighted.contains(verse.number)
+        let turningOn = !isOn
+        withAnimation(.easeOut(duration: 0.2)) {
+            if isOn { highlighted.remove(verse.number) }
+            else { highlighted.insert(verse.number) }
+        }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        let book = currentBook
+        let chapterNum = currentChapterNum
+        Task {
+            await SupabaseService.shared.setHighlight(
+                book: book, chapter: chapterNum, verse: verse.number, on: turningOn
+            )
+        }
+    }
+
+    private func toggleBookmark(_ verse: BibleVerse) {
+        let isOn = bookmarked.contains(verse.number)
+        let turningOn = !isOn
+        withAnimation(.easeOut(duration: 0.2)) {
+            if isOn { bookmarked.remove(verse.number) }
+            else { bookmarked.insert(verse.number) }
+        }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        let book = currentBook
+        let chapterNum = currentChapterNum
+        Task {
+            await SupabaseService.shared.setBookmark(
+                book: book, chapter: chapterNum, verse: verse.number, on: turningOn
+            )
+        }
+    }
+
+    private func openNoteSheet(for verse: BibleVerse) {
+        noteSheetVerse = verse
+    }
+
+    private func saveNoteAction(verse: BibleVerse, text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let book = currentBook
+        let chapterNum = currentChapterNum
+        await SupabaseService.shared.saveNote(book: book, chapter: chapterNum, verse: verse.number, note: trimmed)
+        if let fetchedNotes = try? await SupabaseService.shared.fetchNotes(book: book, chapter: chapterNum) {
+            notes = Dictionary(uniqueKeysWithValues: fetchedNotes.map { ($0.verse, $0) })
+        }
+    }
+
+    private func deleteNoteAction(verse: BibleVerse) async {
+        guard let id = notes[verse.number]?.id else { return }
+        await SupabaseService.shared.deleteNote(id: id)
+        notes[verse.number] = nil
+    }
+
+    private func shareText(for verse: BibleVerse) -> String {
+        "\"\(verse.text)\" — \(currentBook) \(currentChapterNum):\(verse.number) (\(currentTranslation.rawValue))"
     }
 }
 
@@ -398,6 +564,124 @@ private struct BookPickerSheet: View {
                 }
             }
         }
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Note Sheet
+
+private struct NoteSheet: View {
+    let book: String
+    let chapterNum: Int
+    let verse: BibleVerse
+    let existingNote: VerseNote?
+    let onSave: (String) -> Void
+    let onDelete: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var text: String
+
+    init(book: String, chapterNum: Int, verse: BibleVerse, existingNote: VerseNote?,
+         onSave: @escaping (String) -> Void, onDelete: @escaping () -> Void) {
+        self.book = book
+        self.chapterNum = chapterNum
+        self.verse = verse
+        self.existingNote = existingNote
+        self.onSave = onSave
+        self.onDelete = onDelete
+        _text = State(initialValue: existingNote?.note ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("NOTE — \(book) \(chapterNum):\(verse.number)")
+                .font(.coUI(11, weight: .semibold))
+                .tracking(1.6)
+                .foregroundColor(.coInkTertiary)
+            TextField("Write your note...", text: $text, axis: .vertical)
+                .font(.coUI(14))
+                .foregroundColor(.coInk)
+                .lineLimit(5...10)
+                .padding(12)
+                .frame(minHeight: 120, alignment: .topLeading)
+                .background(Color.coCard)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.coDivider, lineWidth: 1)
+                )
+            COPrimaryButton(title: "Save Note") {
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                onSave(trimmed)
+                dismiss()
+            }
+            if existingNote != nil {
+                COSecondaryButton(title: "Delete Note", tint: .coCrossRed) {
+                    onDelete()
+                    dismiss()
+                }
+            }
+            Spacer()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Notes List Sheet
+
+private struct NotesListSheet: View {
+    let book: String
+    let chapterNum: Int
+    let notes: [VerseNote]
+    let onSelect: (Int) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("NOTES — \(book) \(chapterNum)")
+                .font(.coUI(11, weight: .semibold))
+                .tracking(1.6)
+                .foregroundColor(.coInkTertiary)
+            if notes.isEmpty {
+                Text("No notes yet for this chapter.")
+                    .font(.coUI(14))
+                    .foregroundColor(.coInkSecondary)
+                Spacer()
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(notes.sorted(by: { $0.verse < $1.verse })) { note in
+                            Button {
+                                dismiss()
+                                onSelect(note.verse)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Verse \(note.verse)")
+                                        .font(.coUI(12, weight: .semibold))
+                                        .foregroundColor(.coInkTertiary)
+                                    Text(note.note)
+                                        .font(.coUI(14))
+                                        .foregroundColor(.coInk)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            CODivider()
+                        }
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.coPaper.ignoresSafeArea())
     }
 }

@@ -3,6 +3,9 @@ import SwiftUI
 // MARK: - Kyra
 
 struct KyraView: View {
+    var contextRef: String? = nil
+    var contextText: String? = nil
+
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
@@ -10,16 +13,33 @@ struct KyraView: View {
     @State private var input: String = ""
     @State private var isReflecting = false
     @State private var suggestionUsed = false
+    @State private var hasSentContextPreamble = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
+            if let contextRef {
+                contextChip(contextRef)
+            }
             conversation
             inputBar
         }
         .background(Color.coPaper.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
+    }
+
+    private func contextChip(_ ref: String) -> some View {
+        Text("Reflecting on \(ref)")
+            .font(.coUI(12))
+            .foregroundColor(.coInkSecondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.coPaperSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
     }
 
     // MARK: Header
@@ -171,7 +191,14 @@ struct KyraView: View {
     /// reply silently and instantly — the user should never see an error.
     private func askKyraThen(fallback: [ChatMessage]) {
         withAnimation(.easeOut(duration: 0.25)) { isReflecting = true }
-        let history = messages
+        var history = messages
+        if !hasSentContextPreamble, let contextRef, let contextText {
+            history.insert(
+                ChatMessage(role: .user, text: "Context: I am reading \(contextRef): \"\(contextText)\""),
+                at: 0
+            )
+            hasSentContextPreamble = true
+        }
         let firstName = appState.profile.firstName
         Task {
             var replies = fallback

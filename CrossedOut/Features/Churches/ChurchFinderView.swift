@@ -1,10 +1,12 @@
 import SwiftUI
 import Foundation
+import UIKit
 
 // MARK: - Church Finder
 
 struct ChurchFinderView: View {
     @State private var showFilter = false
+    @State private var savedChurchIDs: Set<UUID> = []
 
     var body: some View {
         ZStack {
@@ -32,6 +34,30 @@ struct ChurchFinderView: View {
         }
         .sheet(isPresented: $showFilter) {
             ChurchFilterSheet()
+        }
+        .task { await loadSavedChurchIDs() }
+    }
+
+    private func loadSavedChurchIDs() async {
+        guard let ids = try? await SupabaseService.shared.fetchSavedChurchIDs() else { return }
+        await MainActor.run {
+            savedChurchIDs = ids
+        }
+    }
+
+    private func toggleSaved(_ church: Church) {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        let churchID = church.id
+        let newValue = !savedChurchIDs.contains(churchID)
+        withAnimation(.easeOut(duration: 0.2)) {
+            if newValue {
+                savedChurchIDs.insert(churchID)
+            } else {
+                savedChurchIDs.remove(churchID)
+            }
+        }
+        Task {
+            await SupabaseService.shared.setChurchSaved(churchID: churchID, saved: newValue)
         }
     }
 
@@ -63,7 +89,8 @@ struct ChurchFinderView: View {
     // MARK: Church Row
 
     private func churchRow(_ church: Church) -> some View {
-        COCard {
+        let isSaved = savedChurchIDs.contains(church.id)
+        return COCard {
             HStack(spacing: 12) {
                 monogram(for: church)
                 VStack(alignment: .leading, spacing: 4) {
@@ -78,6 +105,13 @@ struct ChurchFinderView: View {
                 Text(String(format: "%.1f mi", church.distanceMiles))
                     .font(.coUI(12))
                     .foregroundColor(.coInkTertiary)
+                Button {
+                    toggleSaved(church)
+                } label: {
+                    COIcon(.heart, size: 18, color: isSaved ? .coCrossRed : .coInkTertiary)
+                        .padding(.leading, 4)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

@@ -37,7 +37,10 @@ struct TodayView: View {
             .navigationDestination(for: TodayRoute.self) { route in
                 switch route {
                 case .bible: BibleReaderView(isPushed: true)
-                case .kyra: KyraView()
+                case .kyra: KyraView(
+                    contextRef: appState.todayEntry.verse.ref.display,
+                    contextText: appState.todayEntry.verse.text
+                )
                 }
             }
         }
@@ -50,6 +53,7 @@ struct TodayView: View {
             PrayerSheet {
                 withAnimation { prayedToday = true }
                 UserDefaults.standard.set(true, forKey: TodayView.prayedTodayKey)
+                Task { await SupabaseService.shared.recordCompletion(kind: "prayer") }
             }
             .presentationDetents([.medium])
         }
@@ -164,7 +168,10 @@ struct TodayView: View {
         HStack(spacing: 0) {
             actionButton(.bible, "Read") { path.append(TodayRoute.bible) }
             listenAction
-            actionButton(.journal, "Reflect") { path.append(TodayRoute.kyra) }
+            actionButton(.journal, "Reflect") {
+                path.append(TodayRoute.kyra)
+                Task { await SupabaseService.shared.recordCompletion(kind: "reflection") }
+            }
             prayAction
         }
     }
@@ -175,6 +182,7 @@ struct TodayView: View {
                 speechController.stop()
             } else {
                 speechController.speak(appState.todayEntry.verse.text)
+                Task { await SupabaseService.shared.recordCompletion(kind: "scripture") }
             }
         } label: {
             VStack(spacing: 6) {
@@ -250,6 +258,9 @@ struct TodayView: View {
         Button {
             withAnimation { crossedToday.toggle() }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            if crossedToday {
+                Task { await SupabaseService.shared.recordCompletion(kind: "devotional") }
+            }
         } label: {
             HStack(spacing: 12) {
                 COIcon(crossedToday ? .checkCircle : .crossOut, size: 18,

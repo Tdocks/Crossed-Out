@@ -29,13 +29,14 @@ struct COPrimaryButton: View {
 
 struct COSecondaryButton: View {
     let title: String
+    var tint: Color = .coInkSecondary
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.coUI(15, weight: .medium))
-                .foregroundColor(.coInkSecondary)
+                .foregroundColor(tint)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
         }

@@ -3,12 +3,14 @@ import SwiftUI
 @main
 struct CrossedOutApp: App {
     @StateObject private var appState = AppState()
+    @AppStorage("co.appearance") private var appearanceRaw: String = COAppearance.system.rawValue
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
                 .tint(.coCrossRed)
+                .preferredColorScheme(COAppearance(rawValue: appearanceRaw)?.colorScheme)
                 .onAppear {
                     #if DEBUG
                     Typography.debugPrintFonts()
