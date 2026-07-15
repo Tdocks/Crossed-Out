@@ -214,7 +214,15 @@ enum MockData {
         FocusArea(name: "Confidence", iconHint: "today"),
         FocusArea(name: "Understanding God", iconHint: "bible"),
         FocusArea(name: "Returning to Faith", iconHint: "church"),
-        FocusArea(name: "Learning to Pray", iconHint: "prayer")
+        FocusArea(name: "Learning to Pray", iconHint: "prayer"),
+        FocusArea(name: "Depression & Hope", iconHint: "heart"),
+        FocusArea(name: "Motivation", iconHint: "flame"),
+        FocusArea(name: "Addiction", iconHint: "checkCircle"),
+        FocusArea(name: "Anger", iconHint: "flame"),
+        FocusArea(name: "Leadership", iconHint: "study"),
+        FocusArea(name: "New to Christianity", iconHint: "bible"),
+        FocusArea(name: "Understanding the Bible", iconHint: "bible"),
+        FocusArea(name: "Rest & Peace", iconHint: "leaf")
     ]
 
     // MARK: - Mood tones

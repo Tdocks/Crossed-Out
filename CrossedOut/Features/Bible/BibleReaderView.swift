@@ -50,6 +50,7 @@ struct BibleReaderView: View {
     @State private var bookmarked: Set<Int> = []
     @State private var noteSheetVerse: BibleVerse? = nil
     @State private var showNotesList = false
+    @State private var showHighlightsList = false
 
     @State private var currentTranslation: BibleTranslation = .bsb
     @State private var currentBook: String = "John"
@@ -59,7 +60,7 @@ struct BibleReaderView: View {
     var body: some View {
         Group {
             if isPushed {
-                content
+                content.hidesTabBar()
             } else {
                 NavigationStack { content }
             }
@@ -113,6 +114,19 @@ struct BibleReaderView: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showHighlightsList) {
+            HighlightsListSheet(
+                book: currentBook,
+                chapterNum: currentChapterNum,
+                highlightedVerses: highlightedVerses,
+                onRemove: { verse in toggleHighlight(verse) }
+            )
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private var highlightedVerses: [BibleVerse] {
+        chapterData.verses.filter { highlighted.contains($0.number) }
     }
 
     // MARK: Top Bar
@@ -123,6 +137,8 @@ struct BibleReaderView: View {
                 Button { dismiss() } label: {
                     COIcon(.chevronRight, size: 20, color: .coInkSecondary)
                         .rotationEffect(.degrees(180))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } else {
@@ -310,10 +326,10 @@ struct BibleReaderView: View {
         VStack(spacing: 0) {
             CODivider()
             HStack(spacing: 0) {
-                toolbarItem(.study, "Study") { }
+                toolbarItem(.study, "Study") { showChapters = true }
                 toolbarItem(.note, "Notes") { showNotesList = true }
-                toolbarItem(.highlight, "Highlight") { }
-                toolbarItem(.share, "Share") { }
+                toolbarItem(.highlight, "Highlight") { showHighlightsList = true }
+                shareToolbarItem
             }
             .padding(.top, 10)
             .padding(.bottom, 6)
@@ -333,6 +349,27 @@ struct BibleReaderView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var shareToolbarItem: some View {
+        ShareLink(item: chapterShareText) {
+            VStack(spacing: 5) {
+                COIcon(.share, size: 20, color: .coInkSecondary)
+                Text("Share")
+                    .font(.coUI(10))
+                    .foregroundColor(.coInkSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var chapterShareText: String {
+        let firstTwo = chapterData.verses.prefix(2)
+            .map { "\($0.number) \($0.text)" }
+            .joined(separator: " ")
+        return "\(currentBook) \(currentChapterNum)\n\n\(firstTwo)\n\n— Crossed Out"
     }
 
     // MARK: Actions
@@ -676,6 +713,66 @@ private struct NotesListSheet: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            CODivider()
+                        }
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Highlights List Sheet
+
+private struct HighlightsListSheet: View {
+    let book: String
+    let chapterNum: Int
+    let highlightedVerses: [BibleVerse]
+    let onRemove: (BibleVerse) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("HIGHLIGHTS — \(book) \(chapterNum)")
+                .font(.coUI(11, weight: .semibold))
+                .tracking(1.6)
+                .foregroundColor(.coInkTertiary)
+            if highlightedVerses.isEmpty {
+                COEmptyState(
+                    icon: .highlight,
+                    title: "No highlights in this chapter",
+                    message: "Long-press any verse to highlight it."
+                )
+                Spacer()
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(highlightedVerses) { verse in
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Verse \(verse.number)")
+                                        .font(.coUI(12, weight: .semibold))
+                                        .foregroundColor(.coInkTertiary)
+                                    Text(verse.text)
+                                        .font(.coUI(14))
+                                        .foregroundColor(.coInk)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer(minLength: 12)
+                                Button {
+                                    onRemove(verse)
+                                } label: {
+                                    Text("Remove")
+                                        .font(.coUI(12, weight: .semibold))
+                                        .foregroundColor(.coCrossRed)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                             CODivider()
                         }
                     }

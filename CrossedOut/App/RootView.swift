@@ -62,7 +62,55 @@ struct MainTabView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            COTabBar(selection: $appState.selectedTab)
+            if !appState.tabBarHidden {
+                COTabBar(selection: $appState.selectedTab)
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity,
+                            removal: .opacity.combined(with: .offset(y: 80))
+                        )
+                    )
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: appState.tabBarHidden)
+    }
+}
+
+// MARK: - Hides Tab Bar Modifier
+
+/// Applied to pushed detail screens (Kyra, the pushed Bible reader, etc.) so
+/// the floating COTabBar in MainTabView's ZStack gets out of the way while
+/// that screen is on-screen — otherwise its bottom bars/toolbars render
+/// underneath the tab bar and become untappable.
+struct HidesTabBar: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { appState.tabBarHidden = true }
+            .onDisappear { appState.tabBarHidden = false }
+    }
+}
+
+extension View {
+    func hidesTabBar() -> some View {
+        modifier(HidesTabBar())
+    }
+}
+
+// MARK: - Interactive Swipe-Back
+
+/// `navigationBarBackButtonHidden(true)` (used by several custom-chevron
+/// screens in this app) disables UIKit's interactive edge-swipe-to-pop
+/// gesture as a side effect. Restoring the gesture's delegate here brings
+/// swipe-back back for every navigation controller in the app.
+extension UINavigationController: UIGestureRecognizerDelegate {
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        viewControllers.count > 1
     }
 }

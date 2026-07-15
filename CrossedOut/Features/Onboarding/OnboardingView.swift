@@ -74,18 +74,66 @@ struct OnboardingView: View {
         }
     }
 
+    /// A quiet editorial illustration: a hiker on a near ridge, gazing left
+    /// toward a distant cross, backed by a soft dawn sky. Built entirely from
+    /// SwiftUI shapes/gradients so it reads in both light and dark mode via
+    /// the existing color tokens.
     private var photoPlaceholder: some View {
-        ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(colors: [Color.coPaperSecondary, Color.coDivider],
-                                   startPoint: .top, endPoint: .bottom)
-                )
-            MountainSilhouette()
-                .fill(Color.coInkTertiary.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+
+            ZStack {
+                // (a) Sky
+                LinearGradient(colors: [Color.coPaperSecondary, Color.coDivider],
+                               startPoint: .top, endPoint: .bottom)
+
+                // Soft sun glow, upper right
+                RadialGradient(colors: [Color.coGold.opacity(0.25), Color.coGold.opacity(0)],
+                               center: UnitPoint(x: 0.8, y: 0.18),
+                               startRadius: 2, endRadius: h * 0.6)
+
+                // (b) Far ridge — lightest, smallest
+                RidgeShape(points: OnboardingArt.farRidge)
+                    .fill(Color.coInkTertiary.opacity(0.18))
+
+                // (e) Thin monoline cross planted on the far ridge peak
+                ThinCrossShape()
+                    .stroke(Color.coCrossRed.opacity(0.6),
+                            style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+                    .frame(width: w * 0.028, height: h * 0.12)
+                    .position(x: w * 0.40, y: h * 0.34 - h * 0.05)
+
+                // (d) Mist band between far and mid ridges
+                LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(width: w, height: h * 0.08)
+                    .position(x: w * 0.5, y: h * 0.52)
+
+                // (b) Mid ridge
+                RidgeShape(points: OnboardingArt.midRidge)
+                    .fill(Color.coInkTertiary.opacity(0.30))
+
+                // (d) Mist band between mid and close ridges
+                LinearGradient(colors: [Color.coPaper.opacity(0.5), Color.coPaper.opacity(0)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(width: w, height: h * 0.08)
+                    .position(x: w * 0.5, y: h * 0.70)
+
+                // (b) Close ridge — darkest, largest
+                RidgeShape(points: OnboardingArt.closeRidge)
+                    .fill(Color.coInkTertiary.opacity(0.45))
+
+                // (c) Standing hiker with backpack, right-of-center, gazing
+                // left toward the distant cross
+                HikerSilhouetteShape()
+                    .fill(Color.coInk.opacity(0.7))
+                    .frame(width: w * 0.045, height: 36)
+                    .position(x: w * 0.66, y: h * 0.80 - 18)
+            }
         }
         .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - Focus Step
@@ -96,8 +144,7 @@ struct OnboardingView: View {
                        subtitle: "Choose a few. We'll shape your journey around them.")
 
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)],
-                          alignment: .leading, spacing: 10) {
+                COFlowLayout(hSpacing: 10, vSpacing: 10) {
                     ForEach(MockData.focusAreas) { area in
                         COChip(text: area.name, selected: selectedFocus.contains(area.name)) {
                             toggleFocus(area.name)
@@ -148,8 +195,7 @@ struct OnboardingView: View {
                         .font(.coUI(14, weight: .medium))
                         .foregroundColor(.coInkSecondary)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 10)],
-                              alignment: .leading, spacing: 10) {
+                    COFlowLayout(hSpacing: 10, vSpacing: 10) {
                         ForEach(MockData.moodTones) { mood in
                             COChip(text: mood.label, selected: selectedMood == mood) {
                                 selectedMood = mood
@@ -191,21 +237,94 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Mountain Silhouette
+// MARK: - Onboarding Art
 
-struct MountainSilhouette: Shape {
+/// Shared ridge-line data for the welcome illustration, expressed as
+/// fractional (0...1) points across the frame so RidgeShape can scale to
+/// any container size.
+private enum OnboardingArt {
+    static let farRidge: [CGPoint] = [
+        CGPoint(x: 0, y: 0.55), CGPoint(x: 0.14, y: 0.42), CGPoint(x: 0.28, y: 0.50),
+        CGPoint(x: 0.40, y: 0.34), CGPoint(x: 0.55, y: 0.48), CGPoint(x: 0.70, y: 0.38),
+        CGPoint(x: 0.85, y: 0.50), CGPoint(x: 1, y: 0.44)
+    ]
+    static let midRidge: [CGPoint] = [
+        CGPoint(x: 0, y: 0.75), CGPoint(x: 0.16, y: 0.60), CGPoint(x: 0.33, y: 0.68),
+        CGPoint(x: 0.50, y: 0.55), CGPoint(x: 0.68, y: 0.65), CGPoint(x: 0.85, y: 0.58),
+        CGPoint(x: 1, y: 0.70)
+    ]
+    static let closeRidge: [CGPoint] = [
+        CGPoint(x: 0, y: 0.95), CGPoint(x: 0.18, y: 0.80), CGPoint(x: 0.35, y: 0.88),
+        CGPoint(x: 0.52, y: 0.74), CGPoint(x: 0.66, y: 0.80), CGPoint(x: 0.85, y: 0.76),
+        CGPoint(x: 1, y: 0.90)
+    ]
+}
+
+/// A ridge silhouette built from fractional points (0...1 of the rect),
+/// filled from the ridge line down to the bottom of the frame.
+struct RidgeShape: Shape {
+    let points: [CGPoint]
+
     func path(in rect: CGRect) -> Path {
         var p = Path()
-        let w = rect.width, h = rect.height
-        p.move(to: CGPoint(x: 0, y: h))
-        p.addLine(to: CGPoint(x: w * 0.18, y: h * 0.58))
-        p.addLine(to: CGPoint(x: w * 0.30, y: h * 0.72))
-        p.addLine(to: CGPoint(x: w * 0.48, y: h * 0.40))
-        p.addLine(to: CGPoint(x: w * 0.63, y: h * 0.66))
-        p.addLine(to: CGPoint(x: w * 0.78, y: h * 0.50))
-        p.addLine(to: CGPoint(x: w, y: h * 0.78))
-        p.addLine(to: CGPoint(x: w, y: h))
+        guard let first = points.first else { return p }
+        p.move(to: CGPoint(x: 0, y: rect.height))
+        p.addLine(to: CGPoint(x: first.x * rect.width, y: first.y * rect.height))
+        for pt in points.dropFirst() {
+            p.addLine(to: CGPoint(x: pt.x * rect.width, y: pt.y * rect.height))
+        }
+        p.addLine(to: CGPoint(x: rect.width, y: rect.height))
         p.closeSubpath()
+        return p
+    }
+}
+
+/// A thin two-stroke monoline cross (vertical beam + upper crossbar).
+struct ThinCrossShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.32))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.32))
+        return p
+    }
+}
+
+/// A simple standing hiker silhouette: head, tapered torso, small backpack
+/// bump, and a slight walking stance.
+struct HikerSilhouetteShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var p = Path()
+
+        let headR = w * 0.6
+        p.addEllipse(in: CGRect(x: rect.midX - headR / 2, y: rect.minY, width: headR, height: headR))
+
+        p.move(to: CGPoint(x: rect.minX + w * 0.10, y: rect.minY + h * 0.30))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.90, y: rect.minY + h * 0.30))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.78, y: rect.minY + h * 0.62))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.22, y: rect.minY + h * 0.62))
+        p.closeSubpath()
+
+        p.addRoundedRect(
+            in: CGRect(x: rect.minX + w * 0.55, y: rect.minY + h * 0.32,
+                       width: w * 0.55, height: h * 0.26),
+            cornerSize: CGSize(width: w * 0.15, height: w * 0.15)
+        )
+
+        p.move(to: CGPoint(x: rect.minX + w * 0.30, y: rect.minY + h * 0.62))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.05, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.35, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.48, y: rect.minY + h * 0.62))
+        p.closeSubpath()
+
+        p.move(to: CGPoint(x: rect.minX + w * 0.60, y: rect.minY + h * 0.62))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.85, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.55, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX + w * 0.52, y: rect.minY + h * 0.62))
+        p.closeSubpath()
+
         return p
     }
 }

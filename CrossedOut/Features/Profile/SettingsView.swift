@@ -84,8 +84,7 @@ struct SettingsView: View {
                             .font(.coUI(13, weight: .medium))
                             .foregroundColor(.coInkTertiary)
 
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 10)],
-                                  alignment: .leading, spacing: 10) {
+                        COFlowLayout(hSpacing: 10, vSpacing: 10) {
                             ForEach(MockData.focusAreas) { area in
                                 COChip(text: area.name, selected: focus.contains(area.name)) {
                                     toggleFocus(area.name)

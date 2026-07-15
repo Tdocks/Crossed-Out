@@ -76,6 +76,8 @@ struct COChip: View {
             Text(text)
                 .font(.coUI(14, weight: selected ? .semibold : .regular))
                 .foregroundColor(selected ? .coCrossRed : .coInkSecondary)
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 16)
                 .padding(.vertical, 9)
                 .background(
@@ -86,6 +88,57 @@ struct COChip: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Flow Layout
+
+/// A left-aligned wrapping layout: subviews flow left-to-right and wrap to a
+/// new line at the container width, so intrinsic-width content (like chips)
+/// never breaks mid-word the way an adaptive LazyVGrid column can.
+struct COFlowLayout: Layout {
+    var hSpacing: CGFloat = 10
+    var vSpacing: CGFloat = 10
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var measuredWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                measuredWidth = max(measuredWidth, x - hSpacing)
+                x = 0
+                y += lineHeight + vSpacing
+                lineHeight = 0
+            }
+            x += size.width + hSpacing
+            lineHeight = max(lineHeight, size.height)
+        }
+        measuredWidth = max(measuredWidth, x - hSpacing)
+        y += lineHeight
+        return CGSize(width: maxWidth.isFinite ? maxWidth : measuredWidth, height: y)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x: CGFloat = bounds.minX
+        var y: CGFloat = bounds.minY
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += lineHeight + vSpacing
+                lineHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
+            x += size.width + hSpacing
+            lineHeight = max(lineHeight, size.height)
+        }
     }
 }
 
@@ -283,57 +336,74 @@ struct StrikeLine: Shape {
 
 // MARK: - Brand Wordmark
 
-/// Stacked CROSSED / OUT wordmark with a tapered red brush strike through OUT
-/// and a small red cross mark to the left.
+/// Stacked CROSSED / OUT wordmark. A single rough brush stroke crosses only
+/// the word "OUT", with a small distressed cross mark at the strike's left
+/// end (before the word, not itself struck through).
 struct COBrandWordmark: View {
     var size: CGFloat = 34
 
     var body: some View {
-        VStack(alignment: .leading, spacing: size * 0.02) {
+        VStack(spacing: size * 0.08) {
             Text("CROSSED")
                 .font(.coDisplay(size, weight: .bold))
-                .tracking(size * 0.14)
+                .tracking(size * 0.17)
                 .foregroundColor(.coInk)
-            HStack(spacing: size * 0.22) {
-                COCrossMark()
-                    .stroke(Color.coCrossRed,
-                            style: StrokeStyle(lineWidth: size * 0.07, lineCap: .round))
-                    .frame(width: size * 0.42, height: size * 0.42)
-                Text("OUT")
-                    .font(.coDisplay(size, weight: .bold))
-                    .tracking(size * 0.14)
-                    .foregroundColor(.coInk)
-                    .overlay(brushStrike)
-            }
+                .fixedSize()
+            Text("OUT")
+                .font(.coDisplay(size, weight: .bold))
+                .tracking(size * 0.17)
+                .foregroundColor(.coInk)
+                .fixedSize()
+                .overlay(
+                    GeometryReader { geo in
+                        ZStack {
+                            crossMark
+                                .position(x: -geo.size.width * 0.30, y: geo.size.height * 0.5)
+                            brushStrike(wordWidth: geo.size.width)
+                                .position(x: geo.size.width * 0.5, y: geo.size.height * 0.5)
+                        }
+                        .frame(width: geo.size.width, height: geo.size.height)
+                    }
+                )
         }
         .fixedSize()
     }
 
-    private var brushStrike: some View {
-        GeometryReader { geo in
-            ZStack {
-                Capsule()
-                    .fill(Color.coCrossRed.opacity(0.9))
-                    .frame(width: geo.size.width * 1.18, height: size * 0.13)
-                Capsule()
-                    .fill(Color.coCrossRed.opacity(0.6))
-                    .frame(width: geo.size.width * 1.05, height: size * 0.08)
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
-            .rotationEffect(.degrees(-4))
+    /// Three overlapping, unevenly sized capsules layered to feel like a
+    /// single hand-painted brush stroke rather than a mechanical line.
+    private func brushStrike(wordWidth: CGFloat) -> some View {
+        let h = size * 0.13
+        return ZStack {
+            Capsule()
+                .fill(Color.coCrossRed.opacity(1.0))
+                .frame(width: wordWidth * 1.30, height: h)
+                .offset(x: -wordWidth * 0.01, y: -h * 0.08)
+            Capsule()
+                .fill(Color.coCrossRed.opacity(0.75))
+                .frame(width: wordWidth * 1.22, height: h * 0.68)
+                .offset(x: wordWidth * 0.02, y: h * 0.22)
+            Capsule()
+                .fill(Color.coCrossRed.opacity(0.5))
+                .frame(width: wordWidth * 1.10, height: h * 0.46)
+                .offset(x: -wordWidth * 0.03, y: -h * 0.05)
         }
+        .rotationEffect(.degrees(-6))
     }
-}
 
-/// A small hand-drawn cross (plus with slightly offset arms).
-struct COCrossMark: Shape {
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        p.move(to: CGPoint(x: rect.minX, y: rect.midY - rect.height * 0.08))
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY - rect.height * 0.08))
-        return p
+    /// A small distressed cross: two short rough strokes, the vertical one
+    /// slightly longer, sitting just left of the word with a clear gap so
+    /// the strike never crosses back over it.
+    private var crossMark: some View {
+        ZStack {
+            Capsule()
+                .fill(Color.coCrossRed)
+                .frame(width: size * 0.05, height: size * 0.26)
+            Capsule()
+                .fill(Color.coCrossRed)
+                .frame(width: size * 0.17, height: size * 0.05)
+                .offset(y: -size * 0.015)
+        }
+        .rotationEffect(.degrees(-8))
     }
 }
 

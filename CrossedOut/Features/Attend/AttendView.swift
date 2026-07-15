@@ -5,6 +5,7 @@ import Foundation
 
 struct AttendView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showAllServices = false
 
     /// Unscheduled services ("18m", "45m") derived from the appState feed.
     private var startingSoonServices: [LiveService] {
@@ -48,6 +49,9 @@ struct AttendView: View {
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showAllServices) {
+                AllServicesSheet(services: appState.services)
+            }
         }
     }
 
@@ -55,7 +59,9 @@ struct AttendView: View {
 
     private var liveNowSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            COSectionHeader(title: "Live Now", actionTitle: "See all") {}
+            COSectionHeader(title: "Live Now", actionTitle: "See all") {
+                showAllServices = true
+            }
             liveHeroCard
         }
     }
@@ -199,6 +205,48 @@ fileprivate struct COPlaceholderBlock: View {
                 COIcon(icon, size: iconSize, color: .coInkSecondary)
                     .opacity(0.25)
             )
+    }
+}
+
+// MARK: - All Services Sheet
+
+private struct AllServicesSheet: View {
+    let services: [LiveService]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.coPaper.ignoresSafeArea()
+                if services.isEmpty {
+                    COEmptyState(
+                        icon: .attend,
+                        title: "No services right now",
+                        message: "Check back Sunday morning — or explore churches near you."
+                    )
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(services.enumerated()), id: \.element.id) { index, service in
+                                ServiceRow(service: service, rightLabel: service.time ?? service.startsIn)
+                                if index < services.count - 1 {
+                                    CODivider()
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                    }
+                }
+            }
+            .navigationTitle("All Services")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 

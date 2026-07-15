@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published var streak: StreakState = MockData.streak
     @Published var selectedTab: COTab = .today
     @Published var checkInMood: Mood?
+    @Published var tabBarHidden = false
 
     @Published var passages: [Passage] = []
     @Published var prayers: [PrayerRequest] = []

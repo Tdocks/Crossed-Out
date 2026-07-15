@@ -12,7 +12,7 @@ struct TodayView: View {
     @State private var prayedToday: Bool = UserDefaults.standard.bool(forKey: TodayView.prayedTodayKey)
     @StateObject private var speechController = TodaySpeechController()
 
-    private enum TodayRoute: Hashable { case bible, kyra }
+    private enum TodayRoute: Hashable { case bible, kyra, settings }
 
     private static var prayedTodayKey: String {
         "co.prayedToday." + SupabaseService.dayString(Date())
@@ -44,6 +44,7 @@ struct TodayView: View {
                     contextRef: appState.todayEntry.verse.ref.display,
                     contextText: appState.todayEntry.verse.text
                 )
+                case .settings: SettingsView()
                 }
             }
         }
@@ -75,7 +76,7 @@ struct TodayView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: 8)
-            Button { } label: {
+            Button { path.append(TodayRoute.settings) } label: {
                 COIcon(.bell, size: 20, color: .coInkSecondary)
             }
             .buttonStyle(.plain)
@@ -122,10 +123,10 @@ struct TodayView: View {
             Button { showCheckIn = true } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     (Text("You said: ")
-                        .font(.coUI(14))
+                        .font(.coUI(15))
                         .foregroundColor(.coInkSecondary)
-                     + Text(appState.todayEntry.userNeed)
-                        .font(.coUIItalic(14))
+                     + Text(displayedNeed)
+                        .font(.coUIItalic(15))
                         .foregroundColor(.coCrossRed))
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
@@ -139,6 +140,12 @@ struct TodayView: View {
             .padding(.top, 2)
             .animation(.easeOut(duration: 0.3), value: appState.checkInMood)
         }
+    }
+
+    /// The user's actual onboarding answer, falling back to the mock
+    /// today-entry need only when the profile hasn't captured one yet.
+    private var displayedNeed: String {
+        appState.profile.need.isEmpty ? appState.todayEntry.userNeed : appState.profile.need
     }
 
     private func moodChip(_ mood: Mood) -> some View {
@@ -165,9 +172,9 @@ struct TodayView: View {
                     .font(.coUI(13, weight: .semibold))
                     .foregroundColor(.coInk)
                 Text(appState.todayEntry.verse.text)
-                    .font(.coScripture(20))
+                    .font(.coScripture(22))
                     .foregroundColor(.coInk)
-                    .lineSpacing(8)
+                    .lineSpacing(10)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
                 HStack {
@@ -252,7 +259,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     COIcon(.flame, size: 18, color: .coGold)
-                    Text(appState.todayEntry.focusTitle)
+                    Text(focusTitle)
                         .font(.coUI(15, weight: .semibold))
                         .foregroundColor(.coInk)
                     Spacer()
@@ -262,13 +269,28 @@ struct TodayView: View {
                     .font(.coUI(12))
                     .foregroundColor(.coInkTertiary)
                     .padding(.top, 2)
-                Text(appState.todayEntry.focusWhy)
+                Text(focusWhy)
                     .font(.coUI(13))
                     .foregroundColor(.coInkSecondary)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The user's primary focus area (from onboarding/settings), falling
+    /// back to the mock today-entry title when none has been chosen yet.
+    private var focusTitle: String {
+        appState.profile.focusAreas.first ?? appState.todayEntry.focusTitle
+    }
+
+    /// Dynamic "why this verse" copy built from the user's actual focus
+    /// area, falling back to the mock copy when no focus area is set.
+    private var focusWhy: String {
+        guard let focus = appState.profile.focusAreas.first else {
+            return appState.todayEntry.focusWhy
+        }
+        return "You've been focusing on \(focus.lowercased()) and trusting God's plan."
     }
 
     // MARK: Cross Out Row
@@ -366,16 +388,50 @@ private struct PrayerSheet: View {
 private final class TodaySpeechController: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     @Published var isSpeaking = false
     private let synthesizer = AVSpeechSynthesizer()
+    private let voice: AVSpeechSynthesisVoice?
 
     override init() {
+        voice = Self.bestAvailableVoice()
         super.init()
         synthesizer.delegate = self
     }
 
+    /// Picks the best-sounding en-US voice installed on-device: prefers the
+    /// highest synthesis quality tier available (premium, then enhanced,
+    /// then whatever default exists), and within a tier prefers a short list
+    /// of natural-sounding names.
+    private static func bestAvailableVoice() -> AVSpeechSynthesisVoice? {
+        let preferredNames = ["Ava", "Zoe", "Samantha"]
+        let enUSVoices = AVSpeechSynthesisVoice.speechVoices().filter { $0.language == "en-US" }
+
+        func best(in candidates: [AVSpeechSynthesisVoice]) -> AVSpeechSynthesisVoice? {
+            for name in preferredNames {
+                if let match = candidates.first(where: { $0.name.contains(name) }) {
+                    return match
+                }
+            }
+            return candidates.first
+        }
+
+        let premium = enUSVoices.filter { $0.quality == .premium }
+        let enhanced = enUSVoices.filter { $0.quality == .enhanced }
+
+        return best(in: premium)
+            ?? best(in: enhanced)
+            ?? best(in: enUSVoices)
+            ?? AVSpeechSynthesisVoice(language: "en-US")
+    }
+
     func speak(_ text: String) {
         guard !text.isEmpty else { return }
+        // The silent switch otherwise mutes AVSpeechSynthesizer on-device;
+        // .playback keeps devotional audio audible even when muted.
+        try? AVAudioSession.sharedInstance().setCategory(.playback)
         let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = 0.48
+        utterance.voice = voice
+        utterance.rate = 0.46
+        utterance.pitchMultiplier = 1.0
+        utterance.preUtteranceDelay = 0.1
         isSpeaking = true
         synthesizer.speak(utterance)
     }

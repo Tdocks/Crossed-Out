@@ -4,7 +4,8 @@ import UIKit
 struct CommunityView: View {
     private let segments = ["My Circle", "Church", "Prayer", "Local"]
     @EnvironmentObject private var appState: AppState
-    @State private var selectedSegment = 0
+    @State private var selectedSegment: String = "My Circle"
+    @Namespace private var segmentAnimation
     @State private var showNewPost = false
     @State private var prayedIDs: Set<UUID> = []
     @State private var encouragedIDs: Set<UUID> = []
@@ -28,22 +29,7 @@ struct CommunityView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         segmentRow
-                        COSectionHeader(title: "Prayer Requests", actionTitle: "See all", action: {})
-                        if let request = displayedPrayer {
-                            prayerCard(request)
-                        } else {
-                            COEmptyState(
-                                icon: .prayer,
-                                title: "No prayer requests yet",
-                                message: "Be the first to share what you're carrying — your circle is here for you.",
-                                actionTitle: "Share a request"
-                            ) {
-                                showNewPost = true
-                            }
-                        }
-                        if let post = displayedPost {
-                            verseCard(post)
-                        }
+                        segmentContent
                     }
                     .padding(.horizontal, 22)
                     .padding(.top, 12)
@@ -112,20 +98,148 @@ struct CommunityView: View {
 
     private var segmentRow: some View {
         HStack(spacing: 0) {
-            ForEach(segments.indices, id: \.self) { i in
+            ForEach(segments, id: \.self) { segment in
                 VStack(spacing: 8) {
-                    Text(segments[i])
-                        .font(.coUI(14, weight: i == selectedSegment ? .semibold : .regular))
-                        .foregroundColor(i == selectedSegment ? .coInk : .coInkTertiary)
-                    Rectangle()
-                        .fill(i == selectedSegment ? Color.coCrossRed : Color.clear)
-                        .frame(height: 2)
+                    Text(segment)
+                        .font(.coUI(14, weight: segment == selectedSegment ? .semibold : .regular))
+                        .foregroundColor(segment == selectedSegment ? .coInk : .coInkTertiary)
+                    ZStack {
+                        Rectangle().fill(Color.clear).frame(height: 2)
+                        if segment == selectedSegment {
+                            Rectangle()
+                                .fill(Color.coCrossRed)
+                                .frame(height: 2)
+                                .matchedGeometryEffect(id: "segmentUnderline", in: segmentAnimation)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
-                .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { selectedSegment = i } }
+                .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segment } }
             }
         }
+    }
+
+    // MARK: - Segment Content
+
+    @ViewBuilder
+    private var segmentContent: some View {
+        switch selectedSegment {
+        case "Church": churchContent
+        case "Prayer": prayerContent
+        case "Local": localContent
+        default: myCircleContent
+        }
+    }
+
+    private var myCircleContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            COSectionHeader(title: "Prayer Requests", actionTitle: "See all") {
+                withAnimation(.easeOut(duration: 0.2)) { selectedSegment = "Prayer" }
+            }
+            if let request = displayedPrayer {
+                prayerCard(request)
+            } else {
+                COEmptyState(
+                    icon: .prayer,
+                    title: "No prayer requests yet",
+                    message: "Be the first to share what you're carrying — your circle is here for you.",
+                    actionTitle: "Share a request"
+                ) {
+                    showNewPost = true
+                }
+            }
+            if let post = displayedPost {
+                verseCard(post)
+            }
+        }
+    }
+
+    private var churchContent: some View {
+        let churchPosts = appState.posts.filter { !blockedAuthors.contains($0.authorName) }
+        return VStack(alignment: .leading, spacing: 16) {
+            COSectionHeader(title: "From Your Church")
+            if churchPosts.isEmpty {
+                COEmptyState(
+                    icon: .church,
+                    title: "Nothing from your church yet",
+                    message: "Follow a church in Attend to see its posts here."
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(churchPosts) { post in
+                        verseCard(post)
+                    }
+                }
+            }
+        }
+    }
+
+    private var prayerContent: some View {
+        let list = appState.prayers.filter { !blockedAuthors.contains($0.authorName) }
+        return VStack(alignment: .leading, spacing: 16) {
+            COSectionHeader(title: "Prayer Requests")
+            if list.isEmpty {
+                COEmptyState(
+                    icon: .prayer,
+                    title: "No prayer requests yet",
+                    message: "Be the first to share what you're carrying — your circle is here for you.",
+                    actionTitle: "Share a request"
+                ) {
+                    showNewPost = true
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(list) { request in
+                        prayerCard(request)
+                    }
+                }
+            }
+        }
+    }
+
+    private var localContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            COSectionHeader(title: "Local")
+            Text("Churches near you")
+                .font(.coUI(12))
+                .foregroundColor(.coInkTertiary)
+            if appState.churches.isEmpty {
+                COEmptyState(
+                    icon: .mapPin,
+                    title: "No churches nearby",
+                    message: "We couldn't find churches near you yet."
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(appState.churches.enumerated()), id: \.element.id) { index, church in
+                        localChurchRow(church)
+                        if index < appState.churches.count - 1 {
+                            CODivider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func localChurchRow(_ church: Church) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(church.name)
+                    .font(.coUI(15, weight: .medium))
+                    .foregroundColor(.coInk)
+                Text("\(church.city) · \(church.style)")
+                    .font(.coUI(12))
+                    .foregroundColor(.coInkTertiary)
+            }
+            Spacer()
+            Text(String(format: "%.1f mi", church.distanceMiles))
+                .font(.coUI(12))
+                .foregroundColor(.coInkSecondary)
+        }
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 
     private func prayerCard(_ request: PrayerRequest) -> some View {

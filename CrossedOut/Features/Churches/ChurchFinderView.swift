@@ -6,8 +6,15 @@ import UIKit
 
 struct ChurchFinderView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var showFilter = false
     @State private var savedChurchIDs: Set<UUID> = []
+    @State private var selectedStyleFilter: String = "All"
+
+    private let filterOptions = ["All", "Contemporary", "Worship", "Bible Teaching", "Teaching"]
+
+    private var filteredChurches: [Church] {
+        guard selectedStyleFilter != "All" else { return appState.churches }
+        return appState.churches.filter { $0.style == selectedStyleFilter }
+    }
 
     var body: some View {
         ZStack {
@@ -27,9 +34,15 @@ struct ChurchFinderView: View {
                             title: "No churches found",
                             message: "Try widening your search area."
                         )
+                    } else if filteredChurches.isEmpty {
+                        COEmptyState(
+                            icon: .church,
+                            title: "No churches match this filter",
+                            message: "Try a different style, or choose All to see everything nearby."
+                        )
                     } else {
                         VStack(spacing: 12) {
-                            ForEach(appState.churches) { church in
+                            ForEach(filteredChurches) { church in
                                 churchRow(church)
                             }
                         }
@@ -40,9 +53,6 @@ struct ChurchFinderView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 90)
             }
-        }
-        .sheet(isPresented: $showFilter) {
-            ChurchFilterSheet()
         }
         .task { await loadSavedChurchIDs() }
     }
@@ -79,19 +89,28 @@ struct ChurchFinderView: View {
                 .font(.coUI(14))
                 .foregroundColor(.coInk)
             Spacer()
-            Button {
-                showFilter = true
+            Menu {
+                ForEach(filterOptions, id: \.self) { option in
+                    Button {
+                        selectedStyleFilter = option
+                    } label: {
+                        if option == selectedStyleFilter {
+                            Label(option, systemImage: "checkmark")
+                        } else {
+                            Text(option)
+                        }
+                    }
+                }
             } label: {
-                Text("Filter")
+                Text(selectedStyleFilter == "All" ? "Filter" : selectedStyleFilter)
                     .font(.coUI(13))
-                    .foregroundColor(.coInkSecondary)
+                    .foregroundColor(selectedStyleFilter == "All" ? .coInkSecondary : .coCrossRed)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .overlay(
-                        Capsule().strokeBorder(Color.coDivider, lineWidth: 1)
+                        Capsule().strokeBorder(selectedStyleFilter == "All" ? Color.coDivider : Color.coCrossRed, lineWidth: 1)
                     )
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -163,47 +182,6 @@ struct ChurchFinderView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
-    }
-}
-
-// MARK: - Filter Sheet
-
-fileprivate struct ChurchFilterSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var selected: Set<String> = []
-
-    private let options = ["Contemporary", "Traditional", "Bible Teaching", "Worship", "Young Adults", "Family"]
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.coPaper.ignoresSafeArea()
-                VStack(spacing: 24) {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
-                        ForEach(options, id: \.self) { option in
-                            COChip(text: option, selected: selected.contains(option)) {
-                                toggle(option)
-                            }
-                        }
-                    }
-                    Spacer()
-                    COPrimaryButton(title: "Apply") {
-                        dismiss()
-                    }
-                }
-                .padding(20)
-            }
-            .navigationTitle("Filter")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
-    private func toggle(_ option: String) {
-        if selected.contains(option) {
-            selected.remove(option)
-        } else {
-            selected.insert(option)
-        }
     }
 }
 

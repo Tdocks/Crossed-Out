@@ -14,6 +14,7 @@ struct KyraView: View {
     @State private var isReflecting = false
     @State private var suggestionUsed = false
     @State private var hasSentContextPreamble = false
+    @FocusState private var inputFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,6 +28,7 @@ struct KyraView: View {
         .background(Color.coPaper.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
+        .hidesTabBar()
     }
 
     private func contextChip(_ ref: String) -> some View {
@@ -95,6 +97,7 @@ struct KyraView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 20)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: messages.count) { _, _ in
                 withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
             }
@@ -132,6 +135,7 @@ struct KyraView: View {
                         .font(.coUI(14))
                         .foregroundColor(.coInk)
                         .lineLimit(1...4)
+                        .focused($inputFocused)
                     Button { } label: {
                         MicIcon(size: 18, color: .coInkTertiary)
                     }
@@ -140,6 +144,8 @@ struct KyraView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .overlay(Capsule().strokeBorder(Color.coDivider, lineWidth: 1))
+                .contentShape(Rectangle())
+                .onTapGesture { inputFocused = true }
                 sendButton
             }
             .padding(.horizontal, 20)
@@ -181,6 +187,7 @@ struct KyraView: View {
             messages.append(ChatMessage(role: .user, text: trimmed))
         }
         input = ""
+        inputFocused = true
         askKyraThen(fallback: [
             ChatMessage(role: .kyra, text: "That's worth sitting with. Many Christians find that bringing this honestly to God in prayer is the best first step. Would you like a verse that speaks to it?")
         ])
