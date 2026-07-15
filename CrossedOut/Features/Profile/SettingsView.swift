@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var firstName: String = ""
     @State private var need: String = ""
     @State private var focus: Set<String> = []
+    @State private var showDeleteConfirm = false
+    @State private var isDeletingAccount = false
 
     private let translations = ["BSB", "WEB", "KJV"]
 
@@ -32,6 +34,7 @@ struct SettingsView: View {
                 profileSection
                 preferencesSection
                 aboutSection
+                accountSection
 
                 Spacer(minLength: 80)
             }
@@ -282,6 +285,64 @@ struct SettingsView: View {
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    // MARK: - Account
+
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionCaption("ACCOUNT")
+
+            COCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    if isDeletingAccount {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Deleting your account…")
+                                .font(.coUI(14))
+                                .foregroundColor(.coInkTertiary)
+                        }
+                    } else {
+                        Button {
+                            showDeleteConfirm = true
+                        } label: {
+                            HStack {
+                                Text("Delete Account")
+                                    .font(.coUI(15, weight: .medium))
+                                    .foregroundColor(.coCrossRed)
+                                Spacer()
+                                COIcon(.chevronRight, size: 12, color: .coCrossRed)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete your account? This permanently removes your profile, streaks, highlights, notes, and prayers. This cannot be undone.",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Everything", role: .destructive) {
+                deleteAccount()
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func deleteAccount() {
+        isDeletingAccount = true
+        Task {
+            let success = await SupabaseService.shared.deleteAccount()
+            isDeletingAccount = false
+            if success {
+                for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("co.") {
+                    UserDefaults.standard.removeObject(forKey: key)
+                }
+                appState.signOutAndReset()
+            }
+        }
     }
 }
 

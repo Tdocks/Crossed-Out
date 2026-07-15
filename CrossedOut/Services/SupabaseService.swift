@@ -812,6 +812,90 @@ extension SupabaseService {
     var isAnonymous: Bool {
         client.auth.currentSession?.user.isAnonymous ?? true
     }
+
+    /// Signs in with a Sign in with Apple identity token. `nonce` must be the
+    /// raw (unhashed) nonce that was SHA256-hashed into the original Apple
+    /// authorization request.
+    func signInWithApple(idToken: String, nonce: String) async throws {
+        _ = try await client.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+    }
+}
+
+// MARK: - Safety & Account
+
+extension SupabaseService {
+    private struct ContentReportInsert: Encodable {
+        let reporter_id: UUID
+        let content_kind: String
+        let content_id: UUID?
+        let reason: String
+        let detail: String?
+    }
+
+    /// Best-effort content report insert; never throws.
+    func reportContent(kind: String, contentID: UUID?, reason: String, detail: String?) async {
+        guard let uid = currentUserID else { return }
+        let payload = ContentReportInsert(
+            reporter_id: uid, content_kind: kind, content_id: contentID,
+            reason: reason, detail: detail
+        )
+        do {
+            try await client.from("content_reports").insert(payload).execute()
+        } catch {
+            print("SupabaseService: reportContent failed: \(error)")
+        }
+    }
+
+    private struct UserBlockUpsert: Encodable {
+        let blocker_id: UUID
+        let blocked_user_id: UUID?
+        let blocked_author_name: String
+    }
+
+    /// Best-effort author block upsert; ignores duplicates, never throws.
+    func blockAuthor(name: String, userID: UUID?) async {
+        guard let uid = currentUserID else { return }
+        let payload = UserBlockUpsert(blocker_id: uid, blocked_user_id: userID, blocked_author_name: name)
+        do {
+            try await client
+                .from("user_blocks")
+                .upsert(payload, onConflict: "blocker_id,blocked_author_name", ignoreDuplicates: true)
+                .execute()
+        } catch {
+            print("SupabaseService: blockAuthor failed: \(error)")
+        }
+    }
+
+    private struct BlockedAuthorRow: Decodable {
+        let blocked_author_name: String
+    }
+
+    /// The set of author names the current user has blocked.
+    func fetchBlockedAuthors() async throws -> Set<String> {
+        guard let uid = currentUserID else { return [] }
+        let rows: [BlockedAuthorRow] = try await client
+            .from("user_blocks")
+            .select("blocked_author_name")
+            .eq("blocker_id", value: uid)
+            .execute()
+            .value
+        return Set(rows.map(\.blocked_author_name))
+    }
+
+    /// Deletes the current user's account via the `delete_own_account` RPC
+    /// (rows cascade server-side), then best-effort signs out locally.
+    func deleteAccount() async -> Bool {
+        do {
+            try await client.rpc("delete_own_account").execute()
+            try? await client.auth.signOut()
+            return true
+        } catch {
+            print("SupabaseService: deleteAccount failed: \(error)")
+            return false
+        }
+    }
 }
 
 // MARK: - Streak & Working Items

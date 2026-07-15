@@ -8,13 +8,16 @@ struct CommunityView: View {
     @State private var showNewPost = false
     @State private var prayedIDs: Set<UUID> = []
     @State private var encouragedIDs: Set<UUID> = []
+    @State private var blockedAuthors: Set<String> = []
+    @State private var justReportedIDs: Set<UUID> = []
 
     private var displayedPrayer: PrayerRequest? {
-        appState.prayers.first
+        appState.prayers.first(where: { !blockedAuthors.contains($0.authorName) })
     }
 
     private var displayedPost: CommunityPost? {
-        appState.posts.first(where: { $0.kind == .verseShare }) ?? appState.posts.first
+        appState.posts.first(where: { $0.kind == .verseShare && !blockedAuthors.contains($0.authorName) })
+            ?? appState.posts.first(where: { !blockedAuthors.contains($0.authorName) })
     }
 
     var body: some View {
@@ -51,6 +54,53 @@ struct CommunityView: View {
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(isPresented: $showNewPost) { PrayerRequestComposerSheet() }
+            .task {
+                if let fetched = try? await SupabaseService.shared.fetchBlockedAuthors() {
+                    blockedAuthors = fetched
+                }
+            }
+        }
+    }
+
+    // MARK: - Report & Block
+
+    private func reportContent(kind: String, contentID: UUID, reason: String) {
+        Task {
+            await SupabaseService.shared.reportContent(kind: kind, contentID: contentID, reason: reason, detail: nil)
+        }
+        withAnimation(.easeOut(duration: 0.2)) {
+            _ = justReportedIDs.insert(contentID)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                _ = justReportedIDs.remove(contentID)
+            }
+        }
+    }
+
+    private func block(authorName: String) {
+        withAnimation(.easeOut(duration: 0.25)) {
+            _ = blockedAuthors.insert(authorName)
+        }
+        Task {
+            await SupabaseService.shared.blockAuthor(name: authorName, userID: nil)
+        }
+    }
+
+    @ViewBuilder
+    private func reportBlockMenu(contentKind: String, contentID: UUID, authorName: String) -> some View {
+        Menu {
+            Button("Spam") { reportContent(kind: contentKind, contentID: contentID, reason: "Spam") }
+            Button("Harmful or abusive") { reportContent(kind: contentKind, contentID: contentID, reason: "Harmful or abusive") }
+            Button("Inappropriate") { reportContent(kind: contentKind, contentID: contentID, reason: "Inappropriate") }
+            Button("Other") { reportContent(kind: contentKind, contentID: contentID, reason: "Other") }
+        } label: {
+            Label("Report Content", systemImage: "flag")
+        }
+        Button(role: .destructive) {
+            block(authorName: authorName)
+        } label: {
+            Label("Block \(authorName)", systemImage: "person.slash")
         }
     }
 
@@ -115,7 +165,16 @@ struct CommunityView: View {
                             .foregroundColor(.coInkSecondary)
                     }
                 }
+                if justReportedIDs.contains(request.id) {
+                    Text("Reported — thank you.")
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkTertiary)
+                        .transition(.opacity)
+                }
             }
+        }
+        .contextMenu {
+            reportBlockMenu(contentKind: "prayer_request", contentID: request.id, authorName: request.authorName)
         }
     }
 
@@ -181,7 +240,16 @@ struct CommunityView: View {
                             .foregroundColor(.coInkSecondary)
                     }
                 }
+                if justReportedIDs.contains(post.id) {
+                    Text("Reported — thank you.")
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkTertiary)
+                        .transition(.opacity)
+                }
             }
+        }
+        .contextMenu {
+            reportBlockMenu(contentKind: "community_post", contentID: post.id, authorName: post.authorName)
         }
     }
 

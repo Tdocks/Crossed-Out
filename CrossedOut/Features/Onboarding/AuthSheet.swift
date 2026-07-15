@@ -1,4 +1,7 @@
 import SwiftUI
+import AuthenticationServices
+import CryptoKit
+import Security
 
 enum AuthMode {
     case signIn
@@ -35,6 +38,7 @@ struct AuthSheet: View {
     @State private var password = ""
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @State private var currentNonce: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -49,8 +53,14 @@ struct AuthSheet: View {
                 .lineSpacing(3)
                 .padding(.top, 8)
 
-            authField("Email", text: $email, secure: false)
+            appleButton
                 .padding(.top, 28)
+
+            orDivider
+                .padding(.top, 20)
+
+            authField("Email", text: $email, secure: false)
+                .padding(.top, 20)
             authField("Password", text: $password, secure: true)
                 .padding(.top, 12)
 
@@ -89,6 +99,27 @@ struct AuthSheet: View {
 
     private var isValid: Bool {
         email.contains("@") && password.count >= 6
+    }
+
+    private var appleButtonLabel: SignInWithAppleButton.Label {
+        mode == .signIn ? .signIn : .continue
+    }
+
+    private var appleButton: some View {
+        SignInWithAppleButton(appleButtonLabel, onRequest: configureAppleRequest, onCompletion: handleAppleCompletion)
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 50)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            CODivider()
+            Text("or")
+                .font(.coUI(12))
+                .foregroundColor(.coInkTertiary)
+            CODivider()
+        }
     }
 
     private func authField(_ placeholder: String, text: Binding<String>, secure: Bool) -> some View {
@@ -148,6 +179,73 @@ struct AuthSheet: View {
             return "An account with that email already exists. Try signing in."
         }
         return "Something went wrong. Please try again."
+    }
+
+    // MARK: - Sign in with Apple
+
+    private func configureAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+        let nonce = Self.randomNonceString()
+        currentNonce = nonce
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = Self.sha256(nonce)
+    }
+
+    private func handleAppleCompletion(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let idToken = String(data: tokenData, encoding: .utf8),
+                let nonce = currentNonce
+            else {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    errorMessage = "Apple sign-in isn't available yet. Use email for now."
+                }
+                return
+            }
+
+            errorMessage = nil
+            isLoading = true
+            Task {
+                do {
+                    try await SupabaseService.shared.signInWithApple(idToken: idToken, nonce: nonce)
+                    isLoading = false
+                    onSuccess()
+                    dismiss()
+                } catch {
+                    isLoading = false
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        errorMessage = "Apple sign-in isn't available yet. Use email for now."
+                    }
+                }
+            }
+
+        case .failure(let error):
+            if let authError = error as? ASAuthorizationError, authError.code == .canceled {
+                return
+            }
+            withAnimation(.easeOut(duration: 0.2)) {
+                errorMessage = "Apple sign-in isn't available yet. Use email for now."
+            }
+        }
+    }
+
+    private static func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        let status = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        if status != errSecSuccess {
+            // Extremely unlikely; fall back to a UUID-derived nonce rather than crash.
+            return UUID().uuidString + UUID().uuidString
+        }
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
+        return String(randomBytes.map { charset[Int($0) % charset.count] })
+    }
+
+    private static func sha256(_ input: String) -> String {
+        let hashed = SHA256.hash(data: Data(input.utf8))
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
 
