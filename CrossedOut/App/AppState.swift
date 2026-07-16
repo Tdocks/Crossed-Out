@@ -3,6 +3,9 @@ import SwiftUI
 @MainActor
 final class AppState: ObservableObject {
     @Published var hasOnboarded: Bool = false
+    /// True when there is a persisted, active Supabase session. The app has
+    /// no anonymous fallback — a real account is required to use it.
+    @Published var isAuthenticated: Bool = false
     @Published var profile: UserProfile = MockData.profile
     @Published var todayEntry: DailyEntry = MockData.todayEntry
     @Published var streak: StreakState = MockData.streak
@@ -54,6 +57,8 @@ final class AppState: ObservableObject {
     /// Loads initial state. Mock defaults show instantly; Supabase data
     /// replaces individual pieces as each fetch succeeds, independently.
     func bootstrap() async {
+        refreshAuthState()
+
         // Mock fills only what's missing — a restored (persisted) profile
         // from a completed onboarding is left in place.
         if !hasOnboarded {
@@ -70,7 +75,6 @@ final class AppState: ObservableObject {
 
         Task {
             let service = SupabaseService.shared
-            let signedIn = await service.signInAnonymouslyIfNeeded()
 
             let passagesResult = try? await service.fetchPassages(topics: nil)
             if let fetched = passagesResult, !fetched.isEmpty {
@@ -118,7 +122,7 @@ final class AppState: ObservableObject {
             profile.dayNumber = computedDayNumber
             persistProfile()
 
-            guard signedIn else { return }
+            guard isAuthenticated else { return }
 
             weekRhythm = (try? await service.fetchWeekCompletions()) ?? [:]
 
@@ -261,6 +265,7 @@ final class AppState: ObservableObject {
         )
         profile = newProfile
         hasOnboarded = true
+        refreshAuthState()
         persistHasOnboarded()
         persistProfile()
         Task {
@@ -276,19 +281,32 @@ final class AppState: ObservableObject {
 
     // MARK: - Auth
 
+    /// Refreshes `isAuthenticated` from the current Supabase session state.
+    /// Call this after any sign-in or sign-out so the auth gate in RootView
+    /// stays in sync with the real session.
+    func refreshAuthState() {
+        isAuthenticated = SupabaseService.shared.isAuthenticated
+    }
+
     /// Called after a successful sign-in from AuthSheet: marks onboarding
-    /// complete and re-runs bootstrap so remote data merges in.
+    /// complete, refreshes auth state, and re-runs bootstrap so remote data
+    /// merges in.
     func refreshAfterAuth() {
         hasOnboarded = true
+        refreshAuthState()
         persistHasOnboarded()
         Task { await bootstrap() }
     }
 
-    /// Signs out and returns the app to onboarding.
+    /// Signs out. `hasOnboarded` is intentionally left untouched so a
+    /// returning user who signs out lands on the mandatory auth gate
+    /// (RootView) rather than being sent back through onboarding.
     func signOutAndReset() {
-        Task { await SupabaseService.shared.signOut() }
-        hasOnboarded = false
-        persistHasOnboarded()
+        isAuthenticated = false
+        Task {
+            await SupabaseService.shared.signOut()
+            refreshAuthState()
+        }
     }
 
     /// Crosses out a working item locally and syncs to Supabase.

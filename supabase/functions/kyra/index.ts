@@ -1,7 +1,14 @@
 // Kyra — Crossed Out's guide. Proxies OpenAI so the API key never ships in the app.
+// Requires a real (non-anonymous) authenticated Supabase user and enforces a
+// per-user daily usage cap via public.increment_kyra_usage (see migration 0008).
 // Deploy: ./supabase/deploy_kyra.sh (see repo root)
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
 const MODEL = Deno.env.get("KYRA_MODEL") ?? "gpt-5.6-luna";
+const DAILY_LIMIT = Number(Deno.env.get("KYRA_DAILY_LIMIT") ?? "30");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const SYSTEM_PROMPT = `You are Kyra, the gentle guide inside Crossed Out, a Christian
 formation app. You are warm, calm, intelligent, nonjudgmental, and grounded.
@@ -27,12 +34,47 @@ Deno.serve(async (req) => {
   };
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  const jsonError = (status: number, error: string, extra?: Record<string, unknown>) =>
+    new Response(JSON.stringify({ error, ...extra }), {
+      status, headers: { ...cors, "Content-Type": "application/json" },
+    });
+
   try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!jwt) {
+      return jsonError(401, "unauthorized");
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+      auth: { persistSession: false },
+    });
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return jsonError(401, "unauthorized");
+    }
+    if (userData.user.is_anonymous) {
+      return jsonError(403, "anonymous_not_allowed");
+    }
+
+    const { data: allowed, error: rpcError } = await supabase.rpc(
+      "increment_kyra_usage",
+      { p_limit: DAILY_LIMIT },
+    );
+    if (rpcError) {
+      return jsonError(500, "rate_limit_check_failed");
+    }
+    if (!allowed) {
+      return jsonError(429, "daily_limit_reached", {
+        message: "You've reached today's Kyra limit — come back tomorrow.",
+      });
+    }
+
     const { messages, firstName } = await req.json();
     if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: "messages required" }), {
-        status: 400, headers: { ...cors, "Content-Type": "application/json" },
-      });
+      return jsonError(400, "messages required");
     }
 
     const trimmed = messages.slice(-12).map((m: { role: string; text: string }) => ({

@@ -7,10 +7,15 @@ struct RootView: View {
         Group {
             if let screen = debugScreen {
                 debugDestination(screen)
-            } else if appState.hasOnboarded {
-                MainTabView()
-            } else {
+            } else if !appState.hasOnboarded {
                 OnboardingView()
+            } else if !appState.isAuthenticated {
+                // Returning user with no active session (e.g. signed out, or
+                // a stale/missing session at launch). There is no anonymous
+                // fallback, so this gate is mandatory and non-dismissible.
+                AuthGateView()
+            } else {
+                MainTabView()
             }
         }
         .task { await appState.bootstrap() }
@@ -73,6 +78,40 @@ struct MainTabView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: appState.tabBarHidden)
+    }
+}
+
+// MARK: - Mandatory Auth Gate
+
+/// Full-screen, non-dismissible sign-in gate shown when a previously
+/// onboarded user has no active Supabase session (most commonly right after
+/// they sign out). Reuses AuthSheet's Apple + email UI directly in the view
+/// hierarchy (not as a `.sheet`), so there is no swipe-to-dismiss and no
+/// "skip" affordance — a real account is required to reach MainTabView.
+struct AuthGateView: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var mode: AuthMode = .signIn
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: 20)
+            AuthSheet(mode: mode) {
+                appState.refreshAuthState()
+            }
+            modeToggle
+        }
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+
+    private var modeToggle: some View {
+        Button {
+            mode = (mode == .signIn) ? .createAccount : .signIn
+        } label: {
+            Text(mode == .signIn ? "Need an account? Create one" : "Already have an account? Sign in")
+                .font(.coUI(13))
+                .foregroundColor(.coInkSecondary)
+        }
+        .padding(.bottom, 24)
     }
 }
 

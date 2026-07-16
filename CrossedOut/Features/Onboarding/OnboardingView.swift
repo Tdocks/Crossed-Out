@@ -3,14 +3,13 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject private var appState: AppState
 
-    private enum Step { case welcome, focus, need }
+    private enum Step { case welcome, focus, need, auth }
 
     @State private var step: Step = .welcome
     @State private var selectedFocus: Set<String> = []
     @State private var needText: String = ""
     @State private var selectedMood: Mood?
-    @State private var showSignIn = false
-    @State private var showCreateAccount = false
+    @State private var authMode: AuthMode = .createAccount
 
     var body: some View {
         ZStack {
@@ -19,25 +18,53 @@ struct OnboardingView: View {
             case .welcome: welcome
             case .focus: focusStep
             case .need: needStep
+            case .auth: authStep
             }
-        }
-        .sheet(isPresented: $showSignIn) {
-            AuthSheet(mode: .signIn) {
-                appState.refreshAfterAuth()
-            }
-        }
-        .sheet(isPresented: $showCreateAccount, onDismiss: {
-            Task {
-                await appState.completeOnboarding(
-                    name: MockData.profile.firstName,
-                    focus: Array(selectedFocus),
-                    need: needText.isEmpty ? MockData.profile.need : needText
-                )
-            }
-        }) {
-            AuthSheet(mode: .createAccount)
         }
         .animation(.easeInOut(duration: 0.25), value: step)
+    }
+
+    // MARK: - Auth Step
+
+    /// The final, mandatory onboarding step. A real account (Sign in with
+    /// Apple or email/password) is required before onboarding can complete —
+    /// there is no anonymous fallback and no way to skip this step.
+    private var authStep: some View {
+        VStack(spacing: 0) {
+            backButton
+            AuthSheet(mode: authMode) {
+                switch authMode {
+                case .signIn:
+                    // Returning user: adopt their existing remote profile.
+                    appState.refreshAfterAuth()
+                case .createAccount:
+                    // New user: persist the onboarding wizard's selections
+                    // now that a real account backs them.
+                    Task {
+                        await appState.completeOnboarding(
+                            name: MockData.profile.firstName,
+                            focus: Array(selectedFocus),
+                            need: needText.isEmpty ? MockData.profile.need : needText
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var backButton: some View {
+        HStack {
+            Button {
+                step = (authMode == .signIn) ? .welcome : .need
+            } label: {
+                Text("Back")
+                    .font(.coUI(14))
+                    .foregroundColor(.coInkSecondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
     }
 
     // MARK: - Welcome
@@ -66,7 +93,8 @@ struct OnboardingView: View {
             VStack(spacing: 6) {
                 COPrimaryButton(title: "Get Started") { step = .focus }
                 COSecondaryButton(title: "I already have an account") {
-                    showSignIn = true
+                    authMode = .signIn
+                    step = .auth
                 }
             }
             .padding(.horizontal, 24)
@@ -209,9 +237,10 @@ struct OnboardingView: View {
             }
 
             COPrimaryButton(title: "Begin") {
-                // Offer account creation first; onboarding completes when
-                // the sheet dismisses (either path), see sheet onDismiss.
-                showCreateAccount = true
+                // A real account is required to finish onboarding — no
+                // anonymous fallback and no way to skip the auth step.
+                authMode = .createAccount
+                step = .auth
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 20)

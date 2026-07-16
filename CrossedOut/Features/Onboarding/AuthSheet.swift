@@ -77,18 +77,6 @@ struct AuthSheet: View {
                 .disabled(isLoading || !isValid)
                 .padding(.top, 24)
 
-            if mode == .createAccount {
-                Text("Your anonymous progress transfers automatically.")
-                    .font(.coUI(12))
-                    .foregroundColor(.coInkTertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 12)
-
-                COSecondaryButton(title: "Maybe later") { dismiss() }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 6)
-            }
-
             Spacer()
         }
         .padding(.horizontal, 24)

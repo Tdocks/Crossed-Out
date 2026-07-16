@@ -32,21 +32,11 @@ final class SupabaseService {
         client.auth.currentSession?.user.id
     }
 
-    /// Signs in anonymously if there is no existing session.
-    /// Never throws/crashes — anonymous sign-ins may be disabled in the
-    /// dashboard, in which case this just returns false and the app
-    /// keeps running with mock data.
-    func signInAnonymouslyIfNeeded() async -> Bool {
-        if client.auth.currentSession != nil {
-            return true
-        }
-        do {
-            try await client.auth.signInAnonymously()
-            return true
-        } catch {
-            print("SupabaseService: anonymous sign-in failed: \(error)")
-            return false
-        }
+    /// True if there is a persisted, active Supabase session. The app
+    /// requires a real account (email/password or Sign in with Apple) —
+    /// there is no anonymous session fallback.
+    var isAuthenticated: Bool {
+        client.auth.currentSession != nil
     }
 }
 
@@ -722,6 +712,7 @@ extension SupabaseService {
 // MARK: - Kyra AI Chat
 
 enum KyraServiceError: Error {
+    case notSignedIn
     case badResponse
     case missingText
 }
@@ -745,11 +736,19 @@ extension SupabaseService {
     /// returns Kyra's reply text. Uses URLSession directly (simplest — no
     /// need to fight the SDK's functions client for a plain JSON POST).
     func askKyra(messages: [ChatMessage], firstName: String?) async throws -> String {
+        // The Kyra edge function requires the caller's real user JWT and
+        // rejects the static publishable key — surface a clear error here
+        // so the UI can show a "sign in to chat with Kyra" state instead of
+        // a raw 401 from the network call.
+        guard let session = client.auth.currentSession else {
+            throw KyraServiceError.notSignedIn
+        }
+
         let url = SupabaseConfig.url.appendingPathComponent("functions/v1/kyra")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 20
-        request.setValue("Bearer \(SupabaseConfig.key)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -774,16 +773,11 @@ extension SupabaseService {
 // MARK: - Auth
 
 extension SupabaseService {
-    /// Email/password sign-up. If the current session is anonymous, this
-    /// LINKS the anonymous user to the new email/password (preserving all
-    /// existing data) via `auth.update(user:)`. Otherwise it performs a
-    /// fresh `auth.signUp(email:password:)`.
+    /// Email/password sign-up. Always performs a fresh
+    /// `auth.signUp(email:password:)` — the app has no anonymous session to
+    /// link, so every sign-up creates a brand-new real account.
     func signUp(email: String, password: String) async throws {
-        if isAnonymous {
-            _ = try await client.auth.update(user: UserAttributes(email: email, password: password))
-        } else {
-            _ = try await client.auth.signUp(email: email, password: password)
-        }
+        _ = try await client.auth.signUp(email: email, password: password)
     }
 
     /// Signs in an existing user with email/password.
@@ -800,17 +794,11 @@ extension SupabaseService {
         }
     }
 
-    /// The signed-in user's email, or nil if there is none (e.g. anonymous
-    /// or not yet linked to an email).
+    /// The signed-in user's email, or nil if there is none (e.g. signed in
+    /// with Apple only, or not signed in).
     var currentUserEmail: String? {
         let email = client.auth.currentSession?.user.email
         return (email?.isEmpty ?? true) ? nil : email
-    }
-
-    /// True if the current session belongs to an anonymous user, or if
-    /// there is no session at all.
-    var isAnonymous: Bool {
-        client.auth.currentSession?.user.isAnonymous ?? true
     }
 
     /// Signs in with a Sign in with Apple identity token. `nonce` must be the
