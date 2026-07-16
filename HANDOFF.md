@@ -22,7 +22,7 @@ mismatch, and onboarding persisting hardcoded name "Tyler" for every user. The d
 has a full gap register (G1-G20) and a P0/P1/P2 phased roadmap. Six product decisions
 are pending at the end of that doc before executing P0.
 
-## G1 (Jul 16) — Personalization Engine v1 built (code committed), DB NOT applied
+## G1 (Jul 16) — Personalization Engine v1 built + DB APPLIED
 The deterministic personalization engine (the core moat). Taxonomy = the app's 24 focus
 areas + 12 moods. New: migration 0009_personalization.sql (focus_areas, curated_verses,
 curated_verse_tags, verse_impressions, verse_feedback + recommend_today_verse and
@@ -31,9 +31,11 @@ record_verse_feedback RPCs, deterministic scoring, RLS/grants) and 0010_curated_
 Swift: SupabaseService.recommendTodayVerse + sendVerseFeedback; AppState wires Today with
 GRACEFUL FALLBACK (keeps old behavior if RPC/tables absent); TodayView shows a quiet "why
 selected" line + "This spoke to me"/"Not for today" feedback. Build green.
-**TO ACTIVATE:** run 0009 then 0010 in the Supabase SQL editor (or `supabase db push`).
-Until applied, Today silently uses the old fallback verse. Bible book convention =
-full title-case ("Psalms" plural, "1 Peter").
+**APPLIED Jul 16** via psql over the session pooler (0009 + 0010 live: expect 24 focus_areas,
+135 curated_verses, 154 tags, 2 RPCs). NOTE: the DB password was RESET this session — record
+the new one securely (still not in the repo). Behavioral test requires running the CURRENT
+local build signed in as a real user; the deployed TestFlight build predates G1, so Today won't
+personalize there yet. Bible book convention = full title-case ("Psalms" plural, "1 Peter").
 
 ## What this project is
 Premium Christian iOS app ("Living Manuscript" aesthetic — printed Bible × Kinfolk).
