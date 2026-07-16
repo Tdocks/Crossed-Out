@@ -31,7 +31,11 @@ enum AuthMode {
 
 struct AuthSheet: View {
     var mode: AuthMode
-    var onSuccess: () -> Void = {}
+    /// Called after a successful sign-in/sign-up. Passes the Apple-provided
+    /// given name when the user authenticated via Sign in with Apple and
+    /// Apple returned one (only available the first time a user authorizes
+    /// this app) — nil for email/password or when Apple withheld it.
+    var onSuccess: (String?) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
     @State private var email = ""
@@ -147,7 +151,7 @@ struct AuthSheet: View {
                     try await SupabaseService.shared.signUp(email: email, password: password)
                 }
                 isLoading = false
-                onSuccess()
+                onSuccess(nil)
                 dismiss()
             } catch {
                 isLoading = false
@@ -193,13 +197,16 @@ struct AuthSheet: View {
                 return
             }
 
+            let givenName = credential.fullName?.givenName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let appleGivenName = (givenName?.isEmpty ?? true) ? nil : givenName
+
             errorMessage = nil
             isLoading = true
             Task {
                 do {
                     try await SupabaseService.shared.signInWithApple(idToken: idToken, nonce: nonce)
                     isLoading = false
-                    onSuccess()
+                    onSuccess(appleGivenName)
                     dismiss()
                 } catch {
                     isLoading = false

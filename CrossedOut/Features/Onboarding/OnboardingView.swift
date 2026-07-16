@@ -3,9 +3,10 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject private var appState: AppState
 
-    private enum Step { case welcome, focus, need, auth }
+    private enum Step { case welcome, name, focus, need, auth }
 
     @State private var step: Step = .welcome
+    @State private var firstNameText: String = ""
     @State private var selectedFocus: Set<String> = []
     @State private var needText: String = ""
     @State private var selectedMood: Mood?
@@ -16,6 +17,7 @@ struct OnboardingView: View {
             Color.coPaper.ignoresSafeArea()
             switch step {
             case .welcome: welcome
+            case .name: nameStep
             case .focus: focusStep
             case .need: needStep
             case .auth: authStep
@@ -32,17 +34,22 @@ struct OnboardingView: View {
     private var authStep: some View {
         VStack(spacing: 0) {
             backButton
-            AuthSheet(mode: authMode) {
+            AuthSheet(mode: authMode) { appleGivenName in
                 switch authMode {
                 case .signIn:
                     // Returning user: adopt their existing remote profile.
                     appState.refreshAfterAuth()
                 case .createAccount:
                     // New user: persist the onboarding wizard's selections
-                    // now that a real account backs them.
+                    // now that a real account backs them. Prefer the name
+                    // Apple just handed us (only available on first Apple
+                    // authorization); otherwise fall back to what the user
+                    // typed in the name step. completeOnboarding() falls
+                    // back to "Friend" if both are empty.
+                    let resolvedName = resolveFirstName(appleGivenName: appleGivenName)
                     Task {
                         await appState.completeOnboarding(
-                            name: MockData.profile.firstName,
+                            name: resolvedName,
                             focus: Array(selectedFocus),
                             need: needText.isEmpty ? MockData.profile.need : needText
                         )
@@ -50,6 +57,12 @@ struct OnboardingView: View {
                 }
             }
         }
+    }
+
+    private func resolveFirstName(appleGivenName: String?) -> String {
+        let trimmedApple = appleGivenName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmedApple.isEmpty { return trimmedApple }
+        return firstNameText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var backButton: some View {
@@ -91,7 +104,7 @@ struct OnboardingView: View {
             Spacer()
 
             VStack(spacing: 6) {
-                COPrimaryButton(title: "Get Started") { step = .focus }
+                COPrimaryButton(title: "Get Started") { step = .name }
                 COSecondaryButton(title: "I already have an account") {
                     authMode = .signIn
                     step = .auth
@@ -100,6 +113,37 @@ struct OnboardingView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }
+    }
+
+    // MARK: - Name Step
+
+    private var nameStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            stepHeader(title: "What should we\ncall you?",
+                       subtitle: "So your daily verse and Kyra can greet you by name.")
+
+            ScrollView {
+                TextField("First name", text: $firstNameText)
+                    .font(.coUI(16))
+                    .foregroundColor(.coInk)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .padding(14)
+                    .background(Color.coCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.coDivider, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+            }
+
+            COPrimaryButton(title: "Continue") { step = .focus }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
+        }
+        .padding(.top, 20)
     }
 
     /// A quiet editorial illustration: a hiker on a near ridge, gazing left

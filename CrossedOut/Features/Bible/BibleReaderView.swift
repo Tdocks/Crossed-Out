@@ -155,10 +155,22 @@ struct BibleReaderView: View {
             .buttonStyle(.plain)
             translationChip
             Spacer()
-            Button { } label: {
+            Menu {
+                Button { showNotesList = true } label: {
+                    Label("Notes", systemImage: "note.text")
+                }
+                Button { showHighlightsList = true } label: {
+                    Label("Highlights", systemImage: "highlighter")
+                }
+                Button { showChapters = true } label: {
+                    Label("Jump to Chapter", systemImage: "book")
+                }
+                ShareLink(item: chapterShareText) {
+                    Label("Share Chapter", systemImage: "square.and.arrow.up")
+                }
+            } label: {
                 COIcon(.more, size: 20, color: .coInkSecondary)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

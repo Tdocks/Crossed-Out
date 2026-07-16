@@ -136,10 +136,6 @@ struct KyraView: View {
                         .foregroundColor(.coInk)
                         .lineLimit(1...4)
                         .focused($inputFocused)
-                    Button { } label: {
-                        MicIcon(size: 18, color: .coInkTertiary)
-                    }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -265,35 +261,6 @@ private struct KyraBubble: View {
                     .frame(maxWidth: 280, alignment: .trailing)
             }
         }
-    }
-}
-
-// MARK: - Mic Icon (monoline, matches COIcon feel)
-
-private struct MicIcon: View {
-    var size: CGFloat = 18
-    var color: Color = .coInkTertiary
-
-    var body: some View {
-        MicShape()
-            .stroke(color, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
-            .frame(width: size, height: size)
-    }
-}
-
-private struct MicShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let s = min(rect.width, rect.height) / 24
-        let ox = rect.minX + (rect.width - 24 * s) / 2
-        let oy = rect.minY + (rect.height - 24 * s) / 2
-        func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
-        var p = Path()
-        p.addRoundedRect(in: CGRect(x: P(9, 3).x, y: P(9, 3).y, width: 6 * s, height: 10 * s),
-                         cornerSize: CGSize(width: 3 * s, height: 3 * s))
-        p.move(to: P(6, 11)); p.addQuadCurve(to: P(18, 11), control: P(12, 20))
-        p.move(to: P(12, 17)); p.addLine(to: P(12, 20))
-        p.move(to: P(9, 20)); p.addLine(to: P(15, 20))
-        return p
     }
 }
 

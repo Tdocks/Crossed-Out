@@ -3,6 +3,7 @@ import UIKit
 
 struct JourneyProgressView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showGraceDaysInfo = false
 
     private var workingThrough: [WorkingItem] { appState.workingItems }
     private var streak: StreakState { appState.streak }
@@ -62,6 +63,10 @@ struct JourneyProgressView: View {
             .padding(.bottom, 90)
         }
         .background(Color.coPaper.ignoresSafeArea())
+        .sheet(isPresented: $showGraceDaysInfo) {
+            GraceDaysInfoSheet(graceUsed: streak.graceUsed, graceTotal: streak.graceTotal)
+                .presentationDetents([.medium])
+        }
     }
 
     private var streakHero: some View {
@@ -80,21 +85,26 @@ struct JourneyProgressView: View {
     }
 
     private var graceDaysCard: some View {
-        COCard {
-            HStack(spacing: 14) {
-                COIcon(.leaf, size: 22, color: .coOlive)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Grace Days")
-                        .font(.coUI(15, weight: .semibold))
-                        .foregroundColor(.coInk)
-                    Text("\(streak.graceUsed) of \(streak.graceTotal) this month")
-                        .font(.coUI(13))
-                        .foregroundColor(.coInkSecondary)
+        Button {
+            showGraceDaysInfo = true
+        } label: {
+            COCard {
+                HStack(spacing: 14) {
+                    COIcon(.leaf, size: 22, color: .coOlive)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Grace Days")
+                            .font(.coUI(15, weight: .semibold))
+                            .foregroundColor(.coInk)
+                        Text("\(streak.graceUsed) of \(streak.graceTotal) this month")
+                            .font(.coUI(13))
+                            .foregroundColor(.coInkSecondary)
+                    }
+                    Spacer()
+                    COIcon(.chevronRight, size: 14, color: .coInkTertiary)
                 }
-                Spacer()
-                COIcon(.chevronRight, size: 14, color: .coInkTertiary)
             }
         }
+        .buttonStyle(.plain)
     }
 
     private var workingThroughSection: some View {
@@ -177,6 +187,69 @@ struct JourneyProgressView: View {
         }
     }
 }
+
+// MARK: - Grace Days Info Sheet
+
+private struct GraceDaysInfoSheet: View {
+    let graceUsed: Int
+    let graceTotal: Int
+    @Environment(\.dismiss) private var dismiss
+
+    private var remaining: Int { max(0, graceTotal - graceUsed) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                COIcon(.leaf, size: 22, color: .coOlive)
+                Text("Grace Days")
+                    .font(.coDisplay(22, weight: .semibold))
+                    .foregroundColor(.coInk)
+                Spacer()
+            }
+            Text("Life happens. Grace days let you miss a day without breaking your streak, so a hard week doesn't erase your progress.")
+                .font(.coUI(14))
+                .foregroundColor(.coInkSecondary)
+                .lineSpacing(4)
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Used this month")
+                        .font(.coUI(13))
+                        .foregroundColor(.coInkSecondary)
+                    Spacer()
+                    Text("\(graceUsed)")
+                        .font(.coUI(13, weight: .semibold))
+                        .foregroundColor(.coInk)
+                }
+                .padding(.vertical, 10)
+                CODivider()
+                HStack {
+                    Text("Remaining")
+                        .font(.coUI(13))
+                        .foregroundColor(.coInkSecondary)
+                    Spacer()
+                    Text("\(remaining) of \(graceTotal)")
+                        .font(.coUI(13, weight: .semibold))
+                        .foregroundColor(.coInk)
+                }
+                .padding(.vertical, 10)
+            }
+            .padding(.horizontal, 14)
+            .background(Color.coCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.coDivider, lineWidth: 1)
+            )
+            Spacer()
+            COPrimaryButton(title: "Got It") { dismiss() }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Preview
 
 #Preview {
     JourneyProgressView()

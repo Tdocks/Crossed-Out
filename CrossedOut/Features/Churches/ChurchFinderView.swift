@@ -156,14 +156,18 @@ struct ChurchFinderView: View {
         .frame(width: 44, height: 44)
     }
 
+    /// Maps a church's `accent` string to a Color token. The DB seeds store
+    /// short names ("red"/"blue"/"olive"/"gold" — see supabase/migrations),
+    /// while older mock data used design-token-style names ("coCrossRed"/
+    /// "coBlue"/"coOlive"/"coGold"). Matching case-insensitively on a
+    /// substring keeps both forms working and is robust to either source.
     private func accentColor(_ name: String) -> Color {
-        switch name {
-        case "coCrossRed": return .coCrossRed
-        case "coBlue": return .coBlue
-        case "coOlive": return .coOlive
-        case "coGold": return .coGold
-        default: return .coInkSecondary
-        }
+        let normalized = name.lowercased()
+        if normalized.contains("red") { return .coCrossRed }
+        if normalized.contains("blue") { return .coBlue }
+        if normalized.contains("olive") { return .coOlive }
+        if normalized.contains("gold") { return .coGold }
+        return .coInkSecondary
     }
 
     // MARK: Footer
@@ -173,7 +177,7 @@ struct ChurchFinderView: View {
             Text("Can't find what you're looking for?")
                 .font(.coUI(12))
                 .foregroundColor(.coInkTertiary)
-            Button {} label: {
+            Button { openSuggestChurchEmail() } label: {
                 Text("Suggest a Church")
                     .font(.coUI(13, weight: .semibold))
                     .foregroundColor(.coCrossRed)
@@ -182,6 +186,15 @@ struct ChurchFinderView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 12)
+    }
+
+    /// Opens the system mail composer addressed to support with a preset
+    /// subject, so users can suggest a church without any new backend.
+    private func openSuggestChurchEmail() {
+        let subject = "Suggest a Church"
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Suggest%20a%20Church"
+        guard let url = URL(string: "mailto:tdoxwell@icloud.com?subject=\(subject)") else { return }
+        UIApplication.shared.open(url)
     }
 }
 

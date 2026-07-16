@@ -54,7 +54,7 @@ struct MoreHubView: View {
             }
             .background(Color.coPaper.ignoresSafeArea())
             .sheet(isPresented: $showCreateAccount) {
-                AuthSheet(mode: .createAccount) {
+                AuthSheet(mode: .createAccount) { _ in
                     appState.refreshAfterAuth()
                 }
             }
