@@ -709,6 +709,144 @@ extension SupabaseService {
     }
 }
 
+// MARK: - Deterministic Personalization Engine (curated verses)
+//
+// Wraps the `recommend_today_verse` / `record_verse_feedback` RPCs (backend
+// migration 0009). This is purely additive: every entry point here is
+// designed to fail silently (return nil / swallow errors) so Today's screen
+// can fall back to its existing behavior when the backend tables/RPCs
+// aren't deployed yet.
+
+struct RecommendedVerse: Equatable {
+    let curatedVerseId: String
+    let passage: Passage
+    let matchedFocus: String
+    let reason: String
+    let themeSummary: String
+    let score: Int
+}
+
+private struct RecommendTodayVerseParams: Encodable {
+    let p_focus_slugs: [String]
+    let p_mood: String?
+    let p_tone: String?
+    let p_maturity: String?
+}
+
+private struct RecommendTodayVerseRow: Decodable {
+    let curated_verse_id: UUID
+    let book: String
+    let chapter: Int
+    let verse_start: Int
+    let verse_end: Int
+    let matched_focus: String
+    let why_template: String
+    let theme_summary: String
+    let score: Int
+}
+
+extension SupabaseService {
+    /// Calls the `recommend_today_verse` RPC, then fetches the verse text
+    /// for the returned reference in the user's preferred translation via
+    /// the existing `bible_verses` fetch path. Returns nil (never throws
+    /// out of a bootstrap flow — callers should `try?` this) if the RPC
+    /// isn't deployed yet, returns no match, or the verse text lookup fails.
+    func recommendTodayVerse(
+        focusSlugs: [String],
+        mood: String?,
+        tone: String?,
+        maturity: String?
+    ) async throws -> RecommendedVerse? {
+        let params = RecommendTodayVerseParams(
+            p_focus_slugs: focusSlugs, p_mood: mood, p_tone: tone, p_maturity: maturity
+        )
+        let rows: [RecommendTodayVerseRow] = try await client
+            .rpc("recommend_today_verse", params: params)
+            .execute()
+            .value
+        guard let row = rows.first else { return nil }
+
+        let translation = (try? await fetchProfile())?.translation ?? BibleTranslation.bsb.rawValue
+        let text = try await fetchVerseRangeText(
+            translation: translation,
+            book: row.book,
+            chapter: row.chapter,
+            verseStart: row.verse_start,
+            verseEnd: row.verse_end
+        )
+        guard !text.isEmpty else { return nil }
+
+        let ref = VerseRef(
+            book: row.book,
+            chapter: row.chapter,
+            verseStart: row.verse_start,
+            verseEnd: row.verse_end == 0 ? nil : row.verse_end
+        )
+        let passage = Passage(
+            id: row.curated_verse_id,
+            ref: ref,
+            translation: translation,
+            text: text,
+            topics: [row.matched_focus]
+        )
+        let reason = row.why_template.replacingOccurrences(
+            of: "{focus}", with: FocusAreaSlugMap.label(forSlug: row.matched_focus)
+        )
+
+        return RecommendedVerse(
+            curatedVerseId: row.curated_verse_id.uuidString,
+            passage: passage,
+            matchedFocus: row.matched_focus,
+            reason: reason,
+            themeSummary: row.theme_summary,
+            score: row.score
+        )
+    }
+
+    /// Fetches verse text for a book/chapter/verse-range in a given
+    /// translation, reusing the same `bible_verses` table access pattern as
+    /// `fetchChapter`. `verseEnd == 0` means a single verse (verseEnd is
+    /// treated as verseStart).
+    private func fetchVerseRangeText(
+        translation: String, book: String, chapter: Int, verseStart: Int, verseEnd: Int
+    ) async throws -> String {
+        let effectiveEnd = verseEnd == 0 ? verseStart : verseEnd
+        let dtos: [BibleVerseDTO] = try await client
+            .from("bible_verses")
+            .select("verse,text")
+            .eq("translation", value: translation)
+            .eq("book", value: book)
+            .eq("chapter", value: chapter)
+            .gte("verse", value: verseStart)
+            .lte("verse", value: effectiveEnd)
+            .order("verse", ascending: true)
+            .execute()
+            .value
+        return dtos.map { $0.text }.joined(separator: " ")
+    }
+
+    private struct RecordVerseFeedbackParams: Encodable {
+        let p_curated_verse_id: UUID
+        let p_signal: String
+    }
+
+    /// Best-effort feedback signal for a curated verse recommendation.
+    /// Valid signals: 'spoke', 'not_today', 'deeper', 'less_like_this',
+    /// 'more_like_this'. Never throws.
+    func sendVerseFeedback(curatedVerseId: String, signal: String) async {
+        guard let uuid = UUID(uuidString: curatedVerseId) else { return }
+        do {
+            try await client
+                .rpc("record_verse_feedback", params: RecordVerseFeedbackParams(
+                    p_curated_verse_id: uuid, p_signal: signal
+                ))
+                .execute()
+        } catch {
+            print("SupabaseService: sendVerseFeedback failed: \(error)")
+        }
+    }
+}
+
 // MARK: - Kyra AI Chat
 
 enum KyraServiceError: Error {

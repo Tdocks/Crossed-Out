@@ -13,6 +13,14 @@ final class AppState: ObservableObject {
     @Published var checkInMood: Mood?
     @Published var tabBarHidden = false
 
+    /// Quiet "why this verse" line from the deterministic personalization
+    /// engine (recommend_today_verse RPC). Nil whenever that engine hasn't
+    /// produced a result — Today's screen simply omits the reason line then.
+    @Published var todayVerseReason: String?
+    /// The curated_verse_id backing the current recommendation, used to
+    /// attribute feedback signals (spoke / not_today) back to the right row.
+    @Published var todayVerseCuratedID: String?
+
     @Published var passages: [Passage] = []
     @Published var prayers: [PrayerRequest] = []
     @Published var posts: [CommunityPost] = []
@@ -190,7 +198,39 @@ final class AppState: ObservableObject {
                     dayNumber: todayEntry.dayNumber
                 )
             }
+
+            // Deterministic personalization engine (recommend_today_verse
+            // RPC) — purely additive. If it succeeds it takes priority over
+            // whatever verse is currently set above; if it's unavailable
+            // (e.g. migration 0009 not yet deployed) this silently no-ops
+            // and today's existing verse/behavior is left untouched.
+            await applyRecommendedVerseIfAvailable(mood: checkInMood?.rawValue)
         }
+    }
+
+    /// Attempts the new deterministic personalization engine and, only on
+    /// success, overrides Today's verse + exposes a reason line. Any
+    /// failure (RPC not deployed, no match, verse text lookup failure) is
+    /// swallowed — never surfaces an error, never blanks the verse.
+    private func applyRecommendedVerseIfAvailable(mood: String?) async {
+        let slugs = FocusAreaSlugMap.slugs(for: profile.focusAreas)
+        guard let recommended = (try? await SupabaseService.shared.recommendTodayVerse(
+            focusSlugs: slugs, mood: mood, tone: nil, maturity: nil
+        )) ?? nil else { return }
+
+        todayEntry = DailyEntry(
+            id: todayEntry.id,
+            date: todayEntry.date,
+            greetingName: todayEntry.greetingName,
+            carryingPrompt: todayEntry.carryingPrompt,
+            userNeed: todayEntry.userNeed,
+            verse: recommended.passage,
+            focusTitle: todayEntry.focusTitle,
+            focusWhy: todayEntry.focusWhy,
+            dayNumber: todayEntry.dayNumber
+        )
+        todayVerseReason = recommended.reason
+        todayVerseCuratedID = recommended.curatedVerseId
     }
 
     // MARK: - Check-In
@@ -217,6 +257,10 @@ final class AppState: ObservableObject {
                 )
             }
         }
+
+        // Deterministic personalization engine, re-run with the freshly
+        // picked mood. Purely additive — falls back silently if unavailable.
+        await applyRecommendedVerseIfAvailable(mood: mood.rawValue)
 
         bumpStreakForCheckInIfNeeded()
 

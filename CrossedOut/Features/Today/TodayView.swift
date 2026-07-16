@@ -10,6 +10,7 @@ struct TodayView: View {
     @State private var crossedToday = false
     @State private var showPraySheet = false
     @State private var prayedToday: Bool = UserDefaults.standard.bool(forKey: TodayView.prayedTodayKey)
+    @State private var verseFeedbackGiven: String?
     @StateObject private var speechController = TodaySpeechController()
 
     private enum TodayRoute: Hashable { case bible, kyra, settings }
@@ -184,10 +185,49 @@ struct TodayView: View {
                         .tracking(1)
                         .foregroundColor(.coInkTertiary)
                 }
+                if let reason = appState.todayVerseReason {
+                    verseReasonBlock(reason)
+                }
                 CODivider().padding(.vertical, 6)
                 verseActions
             }
         }
+    }
+
+    /// Quiet "why this verse" line from the personalization engine, plus two
+    /// tasteful feedback affordances. Only rendered when the engine actually
+    /// produced a recommendation — otherwise this whole block is absent, no
+    /// placeholder, no error state.
+    private func verseReasonBlock(_ reason: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(reason)
+                .font(.coUI(12))
+                .foregroundColor(.coInkTertiary)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if appState.todayVerseCuratedID != nil {
+                HStack(spacing: 16) {
+                    verseFeedbackButton(title: "This spoke to me", signal: "spoke")
+                    verseFeedbackButton(title: "Not for today", signal: "not_today")
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func verseFeedbackButton(title: String, signal: String) -> some View {
+        let given = verseFeedbackGiven == signal
+        return Button {
+            guard let id = appState.todayVerseCuratedID else { return }
+            withAnimation(.easeOut(duration: 0.2)) { verseFeedbackGiven = signal }
+            Task { await SupabaseService.shared.sendVerseFeedback(curatedVerseId: id, signal: signal) }
+        } label: {
+            Text(given ? "Thank you" : title)
+                .font(.coUI(11, weight: .medium))
+                .foregroundColor(given ? .coCrossRed : .coInkTertiary)
+        }
+        .buttonStyle(.plain)
+        .disabled(verseFeedbackGiven != nil)
     }
 
     private var verseActions: some View {

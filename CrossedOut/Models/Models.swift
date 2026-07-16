@@ -204,3 +204,57 @@ struct UserProfile: Identifiable, Codable, Hashable {
     var translation: String
     var dayNumber: Int
 }
+
+// MARK: - Focus Area Slug Mapping
+//
+// `UserProfile.focusAreas` stores human-readable focus NAMES (as chosen
+// during onboarding). The personalization backend (recommend_today_verse
+// RPC) speaks in stable slugs. This is the single source of truth mapping
+// between the two, in both directions.
+
+enum FocusAreaSlugMap {
+    /// Focus display name -> backend slug.
+    static let nameToSlug: [String: String] = [
+        "Anxiety": "anxiety",
+        "Purpose": "purpose",
+        "Relationships": "relationships",
+        "Financial Wisdom": "financial_wisdom",
+        "Forgiveness": "forgiveness",
+        "Grief": "grief",
+        "Discipline": "discipline",
+        "Loneliness": "loneliness",
+        "Marriage": "marriage",
+        "Parenting": "parenting",
+        "Temptation": "temptation",
+        "Career": "career",
+        "Confidence": "confidence",
+        "Understanding God": "understanding_god",
+        "Returning to Faith": "returning_to_faith",
+        "Learning to Pray": "learning_to_pray",
+        "Depression & Hope": "depression_hope",
+        "Motivation": "motivation",
+        "Addiction": "addiction",
+        "Anger": "anger",
+        "Leadership": "leadership",
+        "New to Christianity": "new_to_christianity",
+        "Understanding the Bible": "understanding_the_bible",
+        "Rest & Peace": "rest_peace",
+    ]
+
+    /// Backend slug -> focus display name (reverse of `nameToSlug`).
+    static let slugToName: [String: String] = Dictionary(
+        uniqueKeysWithValues: nameToSlug.map { ($0.value, $0.key) }
+    )
+
+    /// Maps a list of focus NAMES (as stored on `UserProfile.focusAreas`)
+    /// to backend slugs, dropping any names that aren't in the map.
+    static func slugs(for names: [String]) -> [String] {
+        names.compactMap { nameToSlug[$0] }
+    }
+
+    /// Human label for a backend slug, falling back to a title-cased
+    /// de-slugified guess if the slug is unrecognized.
+    static func label(forSlug slug: String) -> String {
+        slugToName[slug] ?? slug.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+}
