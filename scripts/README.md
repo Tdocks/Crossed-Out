@@ -26,7 +26,7 @@ already written.
 3. Install dependencies:
 
    ```bash
-   pip install openai "psycopg[binary]"
+   pip3 install openai "psycopg[binary]"
    ```
 
 ## Configure environment variables
@@ -82,7 +82,7 @@ at what the model produces:
 
 ```bash
 cd "/Users/tylerdockswell/Projects/Crossed Out /"
-python scripts/tag_bible.py --limit 200
+python3 scripts/tag_bible.py --limit 200
 ```
 
 This embeds and tags the first ~200 not-yet-processed BSB verses (in
@@ -156,15 +156,15 @@ SET embedding = EXCLUDED.embedding`), so re-running after tweaking
 ## Step 2 — the full run
 
 ```bash
-python scripts/tag_bible.py
+python3 scripts/tag_bible.py
 ```
 
 This processes all remaining un-embedded and un-tagged BSB verses (skipping
 anything Step 1 already did). You can also run the phases separately:
 
 ```bash
-python scripts/tag_bible.py --embed-only
-python scripts/tag_bible.py --tag-only
+python3 scripts/tag_bible.py --embed-only
+python3 scripts/tag_bible.py --tag-only
 ```
 
 ### Expected cost (31,102 BSB verses)
