@@ -314,6 +314,32 @@ struct BibleVerseDTO: Codable {
     let text: String
 }
 
+// MARK: - Bible Search
+
+/// A single full-text search hit against `public.bible_verses`, returned by
+/// the `search_bible` RPC (migration 0011).
+struct BibleSearchResult: Identifiable, Hashable {
+    var id: String { "\(book)-\(chapter)-\(verse)" }
+    let book: String
+    let chapter: Int
+    let verse: Int
+    let text: String
+}
+
+private struct SearchBibleParams: Encodable {
+    let p_query: String
+    let p_translation: String
+    let p_limit: Int
+}
+
+private struct SearchBibleRow: Decodable {
+    let book: String
+    let chapter: Int
+    let verse: Int
+    let text: String
+    let rank: Double
+}
+
 // MARK: - Fetch
 
 extension SupabaseService {
@@ -331,6 +357,23 @@ extension SupabaseService {
             .value
         let verses = dtos.map { BibleVerse(number: $0.verse, text: $0.text) }
         return BibleChapter(book: book, chapter: chapter, translation: translation, heading: "", verses: verses)
+    }
+
+    /// Full-text searches Scripture via the `search_bible` RPC (migration
+    /// 0011) within a single translation. Returns an empty array for
+    /// blank/whitespace-only queries without hitting the network. Still
+    /// throws on a genuine RPC/network error — callers should `try?` this
+    /// (as the Bible reader's search UI does) to swallow that failure into
+    /// a calm empty state rather than surfacing it.
+    func searchBible(query: String, translation: String) async throws -> [BibleSearchResult] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let params = SearchBibleParams(p_query: trimmed, p_translation: translation, p_limit: 50)
+        let rows: [SearchBibleRow] = try await client
+            .rpc("search_bible", params: params)
+            .execute()
+            .value
+        return rows.map { BibleSearchResult(book: $0.book, chapter: $0.chapter, verse: $0.verse, text: $0.text) }
     }
 
     func fetchPassages(topics: [String]? = nil) async throws -> [Passage] {

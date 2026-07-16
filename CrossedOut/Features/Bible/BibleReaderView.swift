@@ -51,6 +51,9 @@ struct BibleReaderView: View {
     @State private var noteSheetVerse: BibleVerse? = nil
     @State private var showNotesList = false
     @State private var showHighlightsList = false
+    @State private var showSearch = false
+    @State private var pendingScrollVerse: Int? = nil
+    @State private var emphasizedVerse: Int? = nil
 
     @State private var currentTranslation: BibleTranslation = .bsb
     @State private var currentBook: String = "John"
@@ -70,11 +73,27 @@ struct BibleReaderView: View {
     private var content: some View {
         VStack(spacing: 0) {
             topBar
-            ScrollView(showsIndicators: false) {
-                readingBody
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .padding(.bottom, 40)
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    readingBody
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 40)
+                }
+                .onChange(of: pendingScrollVerse) { _, verseNum in
+                    guard let verseNum else { return }
+                    withAnimation(.easeOut(duration: 0.4)) {
+                        proxy.scrollTo(verseNum, anchor: .center)
+                    }
+                    emphasizedVerse = verseNum
+                    pendingScrollVerse = nil
+                    Task {
+                        try? await Task.sleep(nanoseconds: 1_600_000_000)
+                        withAnimation(.easeOut(duration: 0.5)) {
+                            if emphasizedVerse == verseNum { emphasizedVerse = nil }
+                        }
+                    }
+                }
             }
             bottomToolbar
                 .padding(.bottom, isPushed ? 0 : 58)
@@ -123,6 +142,12 @@ struct BibleReaderView: View {
             )
             .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showSearch) {
+            BibleSearchSheet(translation: currentTranslation) { book, chapterNum, verseNum in
+                selectChapter(book: book, chapterNum: chapterNum, scrollToVerse: verseNum)
+            }
+            .presentationDetents([.large])
+        }
     }
 
     private var highlightedVerses: [BibleVerse] {
@@ -155,6 +180,12 @@ struct BibleReaderView: View {
             .buttonStyle(.plain)
             translationChip
             Spacer()
+            Button { showSearch = true } label: {
+                COIcon(.search, size: 19, color: .coInkSecondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             Menu {
                 Button { showNotesList = true } label: {
                     Label("Notes", systemImage: "note.text")
@@ -213,9 +244,11 @@ struct BibleReaderView: View {
                         .foregroundColor(.coInk)
                         .fixedSize()
                     verseParagraph(first)
+                        .id(first.number)
                 }
                 ForEach(Array(chapterData.verses.dropFirst())) { verse in
                     verseParagraph(verse)
+                        .id(verse.number)
                 }
             }
             chapterNavRow
@@ -289,15 +322,19 @@ struct BibleReaderView: View {
     private func verseParagraph(_ verse: BibleVerse) -> some View {
         let isOn = highlighted.contains(verse.number)
         let isBookmarked = bookmarked.contains(verse.number)
+        let isEmphasized = emphasizedVerse == verse.number
         return verseText(verse)
             .lineSpacing(9)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, isOn ? 8 : 0)
-            .padding(.vertical, isOn ? 4 : 0)
+            .padding(.horizontal, (isOn || isEmphasized) ? 8 : 0)
+            .padding(.vertical, (isOn || isEmphasized) ? 4 : 0)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isOn ? Color.coGold.opacity(0.15) : Color.clear)
+                    .fill(
+                        isEmphasized ? Color.coCrossRed.opacity(0.1)
+                            : (isOn ? Color.coGold.opacity(0.15) : Color.clear)
+                    )
             )
             .overlay(alignment: .leading) {
                 if isBookmarked {
@@ -397,7 +434,7 @@ struct BibleReaderView: View {
         }
     }
 
-    private func selectChapter(book: String, chapterNum: Int) {
+    private func selectChapter(book: String, chapterNum: Int, scrollToVerse: Int? = nil) {
         currentBook = book
         currentChapterNum = chapterNum
         highlighted = []
@@ -405,6 +442,12 @@ struct BibleReaderView: View {
         bookmarked = []
         Task {
             await loadChapter(translation: currentTranslation, book: book, chapterNum: chapterNum)
+            if let scrollToVerse {
+                // Give SwiftUI a beat to render the freshly loaded chapter
+                // before asking the ScrollViewReader to jump to a verse id.
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                pendingScrollVerse = scrollToVerse
+            }
         }
     }
 
@@ -794,6 +837,147 @@ private struct HighlightsListSheet: View {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.coPaper.ignoresSafeArea())
+    }
+}
+
+// MARK: - Bible Search Sheet
+
+/// Full-text search across Scripture (migration 0011 / `search_bible` RPC).
+/// A quiet study tool, not a search-engine results page: a single field,
+/// reference + serif verse snippet per hit, calm empty states, errors
+/// swallowed rather than surfaced.
+private struct BibleSearchSheet: View {
+    let translation: BibleTranslation
+    let onSelect: (String, Int, Int) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var fieldFocused: Bool
+    @State private var query: String = ""
+    @State private var results: [BibleSearchResult] = []
+    @State private var hasSearched = false
+    @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("SEARCH SCRIPTURE")
+                .font(.coUI(11, weight: .semibold))
+                .tracking(1.6)
+                .foregroundColor(.coInkTertiary)
+
+            HStack(spacing: 10) {
+                COIcon(.search, size: 15, color: .coInkTertiary)
+                TextField("Search words or a phrase...", text: $query)
+                    .font(.coUI(15))
+                    .foregroundColor(.coInk)
+                    .submitLabel(.search)
+                    .focused($fieldFocused)
+                    .onSubmit { runSearch() }
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                        results = []
+                        hasSearched = false
+                    } label: {
+                        Text("Clear")
+                            .font(.coUI(12, weight: .semibold))
+                            .foregroundColor(.coInkTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.coCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(fieldFocused ? Color.coCrossRed : Color.coDivider, lineWidth: 1)
+            )
+
+            resultsArea
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.coPaper.ignoresSafeArea())
+        .onAppear { fieldFocused = true }
+    }
+
+    @ViewBuilder
+    private var resultsArea: some View {
+        if isSearching {
+            Spacer()
+            HStack {
+                Spacer()
+                ProgressView()
+                Spacer()
+            }
+            Spacer()
+        } else if !hasSearched {
+            Spacer()
+            COEmptyState(
+                icon: .search,
+                title: "Search the Bible",
+                message: "Find a word, name, or phrase across every verse in \(translation.rawValue)."
+            )
+            Spacer()
+        } else if results.isEmpty {
+            Spacer()
+            COEmptyState(
+                icon: .search,
+                title: "No verses found",
+                message: "Try different words or check your spelling."
+            )
+            Spacer()
+        } else {
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(results) { result in
+                        Button {
+                            dismiss()
+                            onSelect(result.book, result.chapter, result.verse)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(result.book) \(result.chapter):\(result.verse)")
+                                    .font(.coUI(12, weight: .semibold))
+                                    .foregroundColor(.coInkTertiary)
+                                Text(result.text)
+                                    .font(.coScripture(16))
+                                    .foregroundColor(.coInk)
+                                    .lineLimit(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        CODivider()
+                    }
+                }
+            }
+        }
+    }
+
+    private func runSearch() {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            results = []
+            hasSearched = false
+            return
+        }
+        searchTask?.cancel()
+        isSearching = true
+        hasSearched = true
+        searchTask = Task {
+            let found = (try? await SupabaseService.shared.searchBible(
+                query: trimmed, translation: translation.rawValue
+            )) ?? []
+            guard !Task.isCancelled else { return }
+            results = found
+            isSearching = false
+        }
     }
 }
 
