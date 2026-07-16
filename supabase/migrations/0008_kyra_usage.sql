@@ -6,6 +6,7 @@ create table if not exists public.kyra_usage (
   primary key (user_id, usage_date)
 );
 alter table public.kyra_usage enable row level security;
+drop policy if exists "read own kyra usage" on public.kyra_usage;
 create policy "read own kyra usage" on public.kyra_usage
   for select using (auth.uid() = user_id);
 
