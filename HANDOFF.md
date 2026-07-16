@@ -1,5 +1,16 @@
 # Crossed Out — Session Handoff
-_Last updated: Jul 14, 2026, end of build session. Read fully before doing anything._
+_Last updated: Jul 16, 2026. Read fully before doing anything._
+
+## LATEST (Jul 16) — Phase 1 launch hardening done in code (commit b3c7e1f), NOT deployed
+Anonymous auth removed app-wide; real Apple/email account now REQUIRED (mandatory
+auth step in onboarding + full-screen gate for signed-out users). Kyra edge function
+now verifies the user JWT, rejects anon/unauthenticated (401/403), and enforces a
+per-user daily cap (KYRA_DAILY_LIMIT default 30 -> 429). Migrations 0007_require_auth
++ 0008_kyra_usage added but NOT applied. Build green. **App Store submission is on
+hold (Tyler's call).** See **NEXT_PHASES.md** for the full runbook (git push, disable
+anon + enable Apple in Supabase dashboard, apply migrations, deploy kyra, rotate DB
+password + OpenAI key) and the Phase 2–5 plan. Two research reports (ElevenLabs audio
+pricing/plan; church live-stream integration + directory) delivered in chat.
 
 ## What this project is
 Premium Christian iOS app ("Living Manuscript" aesthetic — printed Bible × Kinfolk).
