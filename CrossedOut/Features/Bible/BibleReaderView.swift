@@ -842,10 +842,21 @@ private struct HighlightsListSheet: View {
 
 // MARK: - Bible Search Sheet
 
-/// Full-text search across Scripture (migration 0011 / `search_bible` RPC).
+/// Keyword search (`search_bible` RPC, migration 0011) vs. Meaning search
+/// ("search by meaning" — the `semantic_search` edge function, migration
+/// 0014). Kept as a plain enum rather than a Bool so a third mode can be
+/// added later without a signature change.
+private enum BibleSearchMode: String, CaseIterable {
+    case keyword = "Keyword"
+    case meaning = "Meaning"
+}
+
+/// Search across Scripture — either by exact words/phrase or "by meaning."
 /// A quiet study tool, not a search-engine results page: a single field,
 /// reference + serif verse snippet per hit, calm empty states, errors
-/// swallowed rather than surfaced.
+/// swallowed rather than surfaced. Meaning search falls back to keyword
+/// search silently if the semantic call fails (no key configured, network
+/// error, etc.) — the user never sees an error banner.
 private struct BibleSearchSheet: View {
     let translation: BibleTranslation
     let onSelect: (String, Int, Int) -> Void
@@ -857,6 +868,7 @@ private struct BibleSearchSheet: View {
     @State private var hasSearched = false
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var searchMode: BibleSearchMode = .keyword
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -865,9 +877,11 @@ private struct BibleSearchSheet: View {
                 .tracking(1.6)
                 .foregroundColor(.coInkTertiary)
 
+            searchModeToggle
+
             HStack(spacing: 10) {
                 COIcon(.search, size: 15, color: .coInkTertiary)
-                TextField("Search words or a phrase...", text: $query)
+                TextField(fieldPlaceholder, text: $query)
                     .font(.coUI(15))
                     .foregroundColor(.coInk)
                     .submitLabel(.search)
@@ -903,6 +917,41 @@ private struct BibleSearchSheet: View {
         .onAppear { fieldFocused = true }
     }
 
+    private var fieldPlaceholder: String {
+        switch searchMode {
+        case .keyword: return "Search words or a phrase..."
+        case .meaning: return "Describe what you're carrying..."
+        }
+    }
+
+    /// A quiet, editorial two-way toggle — deliberately not a native
+    /// `.segmented` picker (too chrome-forward for the reader) and not a
+    /// pill button pair (DESIGN_LANGUAGE reserves pills for filters/status).
+    /// Underline + color shift on the active label, hairline divider below.
+    private var searchModeToggle: some View {
+        HStack(spacing: 20) {
+            ForEach(BibleSearchMode.allCases, id: \.self) { mode in
+                let isOn = mode == searchMode
+                Button {
+                    guard mode != searchMode else { return }
+                    searchMode = mode
+                    if hasSearched { runSearch() }
+                } label: {
+                    VStack(spacing: 6) {
+                        Text(mode.rawValue)
+                            .font(.coUI(13, weight: isOn ? .semibold : .regular))
+                            .foregroundColor(isOn ? .coCrossRed : .coInkTertiary)
+                        Rectangle()
+                            .fill(isOn ? Color.coCrossRed : Color.clear)
+                            .frame(height: 2)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+    }
+
     @ViewBuilder
     private var resultsArea: some View {
         if isSearching {
@@ -918,7 +967,7 @@ private struct BibleSearchSheet: View {
             COEmptyState(
                 icon: .search,
                 title: "Search the Bible",
-                message: "Find a word, name, or phrase across every verse in \(translation.rawValue)."
+                message: emptyStateMessage
             )
             Spacer()
         } else if results.isEmpty {
@@ -960,6 +1009,15 @@ private struct BibleSearchSheet: View {
         }
     }
 
+    private var emptyStateMessage: String {
+        switch searchMode {
+        case .keyword:
+            return "Find a word, name, or phrase across every verse in \(translation.rawValue)."
+        case .meaning:
+            return "Describe a feeling or situation, and find verses that speak to it — even without the exact words."
+        }
+    }
+
     private func runSearch() {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -970,13 +1028,37 @@ private struct BibleSearchSheet: View {
         searchTask?.cancel()
         isSearching = true
         hasSearched = true
+        let mode = searchMode
+        let translationValue = translation.rawValue
         searchTask = Task {
-            let found = (try? await SupabaseService.shared.searchBible(
-                query: trimmed, translation: translation.rawValue
-            )) ?? []
+            let found = await Self.performSearch(query: trimmed, translation: translationValue, mode: mode)
             guard !Task.isCancelled else { return }
             results = found
             isSearching = false
+        }
+    }
+
+    /// Runs the search for the given mode. Meaning search falls back to
+    /// keyword search silently if the semantic call throws (missing
+    /// deployment, network error, etc.) — no error banner, matching the
+    /// existing "swallow errors into a calm empty state" pattern.
+    private static func performSearch(
+        query: String, translation: String, mode: BibleSearchMode
+    ) async -> [BibleSearchResult] {
+        switch mode {
+        case .keyword:
+            return (try? await SupabaseService.shared.searchBible(
+                query: query, translation: translation
+            )) ?? []
+        case .meaning:
+            if let semantic = try? await SupabaseService.shared.searchBibleSemantic(
+                query: query, translation: translation
+            ) {
+                return semantic
+            }
+            return (try? await SupabaseService.shared.searchBible(
+                query: query, translation: translation
+            )) ?? []
         }
     }
 }

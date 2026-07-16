@@ -48,8 +48,16 @@ controlled-vocab, no-proof-texting prompt (auto-approve conf>=0.75 else pending;
 ai_tag_progress bookkeeping table).
 ACTIVATE: apply 0011 + 0012 (psql or SQL editor), then `python scripts/tag_bible.py --limit 200`
 (test) -> review verse_tags -> full run (Tyler runs it locally with his OpenAI key + DATABASE_URL).
-FOLLOW-ONS (not built): blend approved verse_tags + semantic similarity into recommend_today_verse;
-user-facing semantic search (query-embedding edge function -> match_verses).
+FOLLOW-ONS (BUILT Jul 16, not deployed): 0013_blend_engine.sql rewrites recommend_today_verse to score
+approved verse_tags (curated boosted +15) + a guarded semantic term via focus_embeddings. Feedback/
+impressions now keyed on (book,chapter,verse); Swift handles nullable curated_verse_id + new
+record_verse_feedback(book,chapter,verse,signal). Behaves identically until AI tags land, then auto-expands.
+0014_match_verses_text.sql (text->vector wrapper) + edge function supabase/functions/semantic_search
++ supabase/deploy_semantic_search.sh + Swift 'Meaning' toggle in Bible search (falls back to keyword on
+error). Pipeline now also embeds the 24 focus areas into focus_embeddings.
+ACTIVATE ALL: apply 0011,0012,0013,0014 (psql/editor); `./supabase/deploy_semantic_search.sh`; run
+scripts/tag_bible.py (test --limit 200, review, full). semantic_search edge fn needs OPENAI_API_KEY
+secret (kyra already set it).
 
 ## What this project is
 Premium Christian iOS app ("Living Manuscript" aesthetic — printed Bible × Kinfolk).

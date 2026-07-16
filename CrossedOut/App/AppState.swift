@@ -17,9 +17,17 @@ final class AppState: ObservableObject {
     /// engine (recommend_today_verse RPC). Nil whenever that engine hasn't
     /// produced a result — Today's screen simply omits the reason line then.
     @Published var todayVerseReason: String?
-    /// The curated_verse_id backing the current recommendation, used to
-    /// attribute feedback signals (spoke / not_today) back to the right row.
+    /// The curated_verse_id backing the current recommendation, if it has
+    /// one — nil for an AI-tagged verse with no matching curated_verses
+    /// row (migration 0013). No longer used to attribute feedback (see
+    /// book/chapter/verse below); kept for anything else that wants it.
     @Published var todayVerseCuratedID: String?
+    /// Verse reference identity of the current recommendation. Feedback
+    /// signals (spoke / not_today) are attributed by this, not by
+    /// curated_verse_id, so feedback works for ANY recommended verse.
+    @Published var todayVerseBook: String?
+    @Published var todayVerseChapter: Int?
+    @Published var todayVerseVerse: Int?
 
     @Published var passages: [Passage] = []
     @Published var prayers: [PrayerRequest] = []
@@ -231,6 +239,9 @@ final class AppState: ObservableObject {
         )
         todayVerseReason = recommended.reason
         todayVerseCuratedID = recommended.curatedVerseId
+        todayVerseBook = recommended.book
+        todayVerseChapter = recommended.chapter
+        todayVerseVerse = recommended.verse
     }
 
     // MARK: - Check-In

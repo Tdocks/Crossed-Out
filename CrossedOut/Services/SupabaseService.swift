@@ -340,6 +340,26 @@ private struct SearchBibleRow: Decodable {
     let rank: Double
 }
 
+/// Request/response bodies for the `semantic_search` edge function (POST
+/// JSON, called directly via URLSession — same pattern as `askKyra`).
+private struct SemanticSearchRequestBody: Encodable {
+    let query: String
+    let translation: String
+    let limit: Int
+}
+
+private struct SemanticSearchResultRow: Decodable {
+    let book: String
+    let chapter: Int
+    let verse: Int
+    let text: String
+    let similarity: Double?
+}
+
+private struct SemanticSearchResponseBody: Decodable {
+    let results: [SemanticSearchResultRow]
+}
+
 // MARK: - Fetch
 
 extension SupabaseService {
@@ -374,6 +394,42 @@ extension SupabaseService {
             .execute()
             .value
         return rows.map { BibleSearchResult(book: $0.book, chapter: $0.chapter, verse: $0.verse, text: $0.text) }
+    }
+
+    /// "Search by meaning" — calls the `semantic_search` edge function
+    /// (embeds `query` with OpenAI, ranks verses via the `match_verses_text`
+    /// RPC from migration 0014). Uses the caller's session access token, the
+    /// same auth pattern as `askKyra`. Returns an empty array for
+    /// blank/whitespace-only queries without hitting the network. Still
+    /// throws on a genuine auth/network/RPC failure — callers should treat
+    /// this as best-effort and fall back to `searchBible` on error.
+    func searchBibleSemantic(query: String, translation: String) async throws -> [BibleSearchResult] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        guard let session = client.auth.currentSession else {
+            throw KyraServiceError.notSignedIn
+        }
+
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/semantic_search")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = SemanticSearchRequestBody(query: trimmed, translation: translation, limit: 30)
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw KyraServiceError.badResponse
+        }
+        let decoded = try JSONDecoder().decode(SemanticSearchResponseBody.self, from: data)
+        return decoded.results.map {
+            BibleSearchResult(book: $0.book, chapter: $0.chapter, verse: $0.verse, text: $0.text)
+        }
     }
 
     func fetchPassages(topics: [String]? = nil) async throws -> [Passage] {
@@ -761,7 +817,17 @@ extension SupabaseService {
 // aren't deployed yet.
 
 struct RecommendedVerse: Equatable {
-    let curatedVerseId: String
+    /// Nil for a verse that only has AI-approved verse_tags and no matching
+    /// curated_verses row — recommend_today_verse's curated_verse_id column
+    /// is nullable for exactly that case (migration 0013). Feedback no
+    /// longer depends on this being present; see book/chapter/verse below.
+    let curatedVerseId: String?
+    /// Verse reference identity, used to attribute feedback signals
+    /// (record_verse_feedback now takes book/chapter/verse, not a curated
+    /// id) regardless of whether this verse has a curated_verses row.
+    let book: String
+    let chapter: Int
+    let verse: Int
     let passage: Passage
     let matchedFocus: String
     let reason: String
@@ -777,7 +843,11 @@ private struct RecommendTodayVerseParams: Encodable {
 }
 
 private struct RecommendTodayVerseRow: Decodable {
-    let curated_verse_id: UUID
+    // Nullable: an AI-tagged verse with no matching curated_verses row
+    // returns NULL here (migration 0013). Decoding this as non-optional
+    // used to throw on such rows, silently dropping that day's
+    // recommendation — the whole point of scoring beyond curated verses.
+    let curated_verse_id: UUID?
     let book: String
     let chapter: Int
     let verse_start: Int
@@ -825,8 +895,12 @@ extension SupabaseService {
             verseStart: row.verse_start,
             verseEnd: row.verse_end == 0 ? nil : row.verse_end
         )
+        // curated_verse_id may be nil for an AI-tagged verse with no
+        // matching curated_verses row — fall back to a fresh UUID so
+        // Passage (which requires a non-optional id) still gets one.
+        // Feedback attribution below uses book/chapter/verse, not this id.
         let passage = Passage(
-            id: row.curated_verse_id,
+            id: row.curated_verse_id ?? UUID(),
             ref: ref,
             translation: translation,
             text: text,
@@ -837,7 +911,10 @@ extension SupabaseService {
         )
 
         return RecommendedVerse(
-            curatedVerseId: row.curated_verse_id.uuidString,
+            curatedVerseId: row.curated_verse_id?.uuidString,
+            book: row.book,
+            chapter: row.chapter,
+            verse: row.verse_start,
             passage: passage,
             matchedFocus: row.matched_focus,
             reason: reason,
@@ -869,19 +946,23 @@ extension SupabaseService {
     }
 
     private struct RecordVerseFeedbackParams: Encodable {
-        let p_curated_verse_id: UUID
+        let p_book: String
+        let p_chapter: Int
+        let p_verse: Int
         let p_signal: String
     }
 
-    /// Best-effort feedback signal for a curated verse recommendation.
-    /// Valid signals: 'spoke', 'not_today', 'deeper', 'less_like_this',
-    /// 'more_like_this'. Never throws.
-    func sendVerseFeedback(curatedVerseId: String, signal: String) async {
-        guard let uuid = UUID(uuidString: curatedVerseId) else { return }
+    /// Best-effort feedback signal for a verse recommendation, keyed by
+    /// verse reference (not curated_verse_id — migration 0013 changed
+    /// record_verse_feedback's signature to this so feedback works for
+    /// AI-tagged verses that have no curated_verses row). Valid signals:
+    /// 'spoke', 'not_today', 'deeper', 'less_like_this', 'more_like_this'.
+    /// Never throws.
+    func sendVerseFeedback(book: String, chapter: Int, verse: Int, signal: String) async {
         do {
             try await client
                 .rpc("record_verse_feedback", params: RecordVerseFeedbackParams(
-                    p_curated_verse_id: uuid, p_signal: signal
+                    p_book: book, p_chapter: chapter, p_verse: verse, p_signal: signal
                 ))
                 .execute()
         } catch {

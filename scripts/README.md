@@ -1,22 +1,27 @@
 # Bible embedding + AI tagging pipeline
 
 `tag_bible.py` embeds every BSB verse (31,102 rows in `bible_verses` where
-`translation='BSB'`) into `verse_embeddings`, and AI-tags every BSB verse into
-`verse_tags` (source `'ai'`), using the controlled vocabularies baked into the
-script. It is resumable: you can stop it (Ctrl-C, crash, laptop sleep) and
-re-run the same command later — it only processes verses it hasn't already
-written.
+`translation='BSB'`) into `verse_embeddings`, AI-tags every BSB verse into
+`verse_tags` (source `'ai'`), and embeds the 24 `focus_areas` into
+`focus_embeddings` (migration `0013_blend_engine.sql` — see "Focus area
+embeddings" below), using the controlled vocabularies baked into the script.
+It is resumable: you can stop it (Ctrl-C, crash, laptop sleep) and re-run the
+same command later — it only processes verses (and focus areas) it hasn't
+already written.
 
 ## Prerequisites
 
-1. **Migration `0012_semantic_and_tags.sql` must already be applied** to your
-   Supabase project. It creates the `vector` extension (`create extension if
-   not exists vector`), the `verse_embeddings` table, and the `verse_tags`
-   table (with its FK to `focus_areas.slug` and CHECK constraints on
-   `emotion`/`tone`/`maturity`/`review_status`/`source`). Apply it the same
-   way you apply the rest of `supabase/migrations/` (Supabase CLI, dashboard
-   SQL editor, or `mcp__Supabase__apply_migration` if you're doing this from
-   an agent session) before running this script.
+1. **Migrations `0012_semantic_and_tags.sql` AND `0013_blend_engine.sql` must
+   already be applied** to your Supabase project. 0012 creates the `vector`
+   extension (`create extension if not exists vector`), the
+   `verse_embeddings` table, and the `verse_tags` table (with its FK to
+   `focus_areas.slug` and CHECK constraints on
+   `emotion`/`tone`/`maturity`/`review_status`/`source`). 0013 adds the
+   `focus_embeddings` table this script's embed phase now writes to, and
+   blends `verse_tags` + `focus_embeddings` into `recommend_today_verse`.
+   Apply them the same way you apply the rest of `supabase/migrations/`
+   (Supabase CLI, dashboard SQL editor, or `mcp__Supabase__apply_migration`
+   if you're doing this from an agent session) before running this script.
 2. Python 3.10+ on your Mac.
 3. Install dependencies:
 
@@ -126,6 +131,28 @@ looks off, adjust `TAGGING_SYSTEM_PROMPT` in `tag_bible.py` and re-run
 `--limit 200` again (it's idempotent — re-running upserts over the same
 rows) before committing to the full Bible.
 
+## Focus area embeddings
+
+As part of the embed phase (`--embed-only` or the default full run — not
+`--tag-only`), the script also embeds the 24 `focus_areas` rows into the
+`focus_embeddings` table added by migration `0013_blend_engine.sql`. This
+powers `recommend_today_verse`'s guarded semantic re-ranking term: it never
+surfaces an untagged verse, it only re-ranks verses that already have an
+approved `verse_tags` match, by how semantically close their embedding is to
+the user's selected focus areas.
+
+Each focus area is embedded from a rich string — its human label plus a
+one-line description of the life situation it represents (see
+`FOCUS_AREA_DESCRIPTIONS` in `tag_bible.py`), not just the bare slug or
+label — so the cosine similarity reflects an actual devotional match. This
+step is cheap: 24 rows, one API call, well under a cent. It's resumable the
+same way as verse embeddings (`focus_embeddings` rows already present are
+never re-embedded — a `LEFT JOIN ... WHERE focus_embeddings.focus_slug IS
+NULL` filter), and upserts on conflict (`ON CONFLICT (focus_slug) DO UPDATE
+SET embedding = EXCLUDED.embedding`), so re-running after tweaking
+`FOCUS_AREA_DESCRIPTIONS` and deleting the old rows (or just letting the
+`DO UPDATE` overwrite them) is safe.
+
 ## Step 2 — the full run
 
 ```bash
@@ -183,6 +210,10 @@ Every phase is resumable by design:
   DB role can't `CREATE TABLE`, the script logs a warning and keeps going —
   it'll just possibly re-send zero-tag verses to the model on a later
   `--resume` run (wasted API cost, not a correctness problem).
+- **Focus area embeddings** — only `focus_areas` slugs without an existing
+  `focus_embeddings` row are re-embedded; already-embedded focus areas are
+  never re-sent to the API. Safe to Ctrl-C and re-run anytime, same as verse
+  embeddings.
 - A bad batch (API error, malformed JSON, a DB constraint violation) is
   logged and skipped — it never crashes the whole run, and it'll be retried
   automatically the next time you run the script.

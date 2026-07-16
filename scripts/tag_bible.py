@@ -4,8 +4,8 @@ tag_bible.py — Embed and AI-tag the entire Bible (BSB translation) for Crossed
 
 WHAT THIS DOES
 --------------
-Runs two independent, resumable phases against the Supabase Postgres DB defined
-by migration 0012_semantic_and_tags.sql:
+Runs three independent, resumable phases against the Supabase Postgres DB
+defined by migrations 0012_semantic_and_tags.sql and 0013_blend_engine.sql:
 
   1. EMBEDDINGS — for every verse in bible_verses where translation='BSB' that
      does not yet have a row in verse_embeddings, calls the OpenAI embeddings
@@ -21,6 +21,15 @@ by migration 0012_semantic_and_tags.sql:
      verses that are not genuinely devotional/applicable (e.g. genealogies,
      census lists, ceremonial-law measurements). Rows are validated against
      the controlled vocab and upserted into verse_tags with source='ai'.
+
+  3. FOCUS AREA EMBEDDINGS — as part of the embed phase (step 1), also embeds
+     the 24 focus_areas (migration 0013_blend_engine.sql's focus_embeddings
+     table) that don't yet have a row: text-embedding-3-small over a rich
+     "label + one-line life-situation description" string per focus area (see
+     FOCUS_AREA_DESCRIPTIONS below), upserted on conflict. This is cheap (24
+     rows, one API call) and powers recommend_today_verse's guarded semantic
+     re-ranking term — it re-ranks already-tagged candidates by similarity to
+     the user's selected focus areas, it never surfaces untagged verses.
 
 CONTROLLED VOCABULARIES (the model must use ONLY these — anything else is
 dropped before insert; see validate_tag() below)
@@ -39,9 +48,13 @@ maturity (3): beginner, growing, mature.
 
 RESUMABILITY
 ------------
-Both phases are idempotent and safe to re-run at any time:
+All three phases are idempotent and safe to re-run at any time:
   - Embeddings: verses already present in verse_embeddings are never
     re-fetched or re-embedded (LEFT JOIN ... WHERE embedding row IS NULL).
+  - Focus area embeddings: the 24 focus_areas rows already present in
+    focus_embeddings are never re-fetched or re-embedded (same LEFT JOIN
+    pattern), and the upsert is ON CONFLICT (focus_slug) DO UPDATE, so it's
+    also safe to force a re-embed by deleting a row and re-running.
   - Tagging: verses that already have >=1 verse_tags row with source='ai'
     are skipped. Because a verse can legitimately produce ZERO tags (e.g. a
     genealogy), we also maintain a small bookkeeping table,
@@ -141,6 +154,38 @@ EMOTIONS = frozenset(
 
 TONES = frozenset(["comfort", "instruction", "challenge"])
 MATURITIES = frozenset(["beginner", "growing", "mature"])
+
+# Rich embedding input for migration 0013's focus_embeddings table: human
+# label + a one-line description of the life situation, so cosine similarity
+# against verse_embeddings reflects an actual devotional match rather than
+# just matching on the bare slug/label string. Keys must match FOCUS_SLUGS
+# exactly (focus_embeddings.focus_slug has an FK to focus_areas.slug).
+FOCUS_AREA_DESCRIPTIONS: dict[str, str] = {
+    "anxiety": "Anxiety: persistent worry, racing thoughts, or fear about what might happen next.",
+    "purpose": "Purpose: searching for meaning, direction, or a sense of why you're here.",
+    "relationships": "Relationships: navigating friendships, family ties, or other close connections.",
+    "financial_wisdom": "Financial Wisdom: money stress, debt, generosity, work, and stewardship of resources.",
+    "forgiveness": "Forgiveness: struggling to forgive someone who hurt you, or needing to be forgiven yourself.",
+    "grief": "Grief: mourning the loss of a loved one, or grieving a loss of any kind.",
+    "discipline": "Discipline: building consistency, self-control, and healthy habits.",
+    "loneliness": "Loneliness: feeling isolated, unseen, or disconnected from others.",
+    "marriage": "Marriage: the joys and struggles of married life and commitment to a spouse.",
+    "parenting": "Parenting: raising children, guiding them, and the exhaustion and joy of family life.",
+    "temptation": "Temptation: resisting sin, desire, or the pull toward something harmful.",
+    "career": "Career: work stress, ambition, job transitions, and finding meaning in labor.",
+    "confidence": "Confidence: self-doubt, insecurity, and needing courage to move forward.",
+    "understanding_god": "Understanding God: wanting to know who God is and what He is like.",
+    "returning_to_faith": "Returning to Faith: coming back to God after doubt, distance, or falling away.",
+    "learning_to_pray": "Learning to Pray: wanting to grow in prayer and talking honestly with God.",
+    "depression_hope": "Depression & Hope: heavy sadness, despair, and needing hope to keep going.",
+    "motivation": "Motivation: feeling stuck, unmotivated, or needing encouragement to keep moving.",
+    "addiction": "Addiction: struggling with a compulsive habit or substance and wanting freedom from it.",
+    "anger": "Anger: frustration, resentment, or rage that needs to be brought honestly before God.",
+    "leadership": "Leadership: leading others well, with humility, wisdom, and integrity.",
+    "new_to_christianity": "New to Christianity: just beginning a relationship with Jesus and the basics of faith.",
+    "understanding_the_bible": "Understanding the Bible: learning how to read, interpret, and apply Scripture.",
+    "rest_peace": "Rest & Peace: needing calm, stillness, and relief from busyness or turmoil.",
+}
 
 TRANSLATION = "BSB"
 
@@ -288,6 +333,7 @@ Do not add commentary, markdown, or any text outside the JSON object.
 @dataclass
 class Stats:
     verses_embedded: int = 0
+    focus_areas_embedded: int = 0
     embed_tokens: int = 0
     verses_considered_for_tagging: int = 0
     tags_written: int = 0
@@ -446,6 +492,39 @@ def upsert_embeddings(conn, verses: list[dict], vectors: list[list[float]]) -> N
     conn.commit()
 
 
+def fetch_focus_areas_needing_embedding(conn) -> list[dict]:
+    """The 24 focus_areas rows that don't yet have a focus_embeddings row
+    (migration 0013_blend_engine.sql). LEFT JOIN filter makes this
+    idempotent/resumable, same pattern as fetch_verses_needing_embedding."""
+    sql = """
+        SELECT fa.slug, fa.label
+        FROM focus_areas fa
+        LEFT JOIN focus_embeddings fe ON fe.focus_slug = fa.slug
+        WHERE fe.focus_slug IS NULL
+        ORDER BY fa.sort
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        return cur.fetchall()
+
+
+def upsert_focus_embeddings(conn, slugs: list[str], vectors: list[list[float]]) -> None:
+    rows = []
+    for slug, vec in zip(slugs, vectors):
+        vec_literal = "[" + ",".join(repr(float(x)) for x in vec) + "]"
+        rows.append((slug, vec_literal))
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO focus_embeddings (focus_slug, embedding)
+            VALUES (%s, %s::vector)
+            ON CONFLICT (focus_slug) DO UPDATE SET embedding = EXCLUDED.embedding
+            """,
+            rows,
+        )
+    conn.commit()
+
+
 def upsert_tags(conn, book: str, chapter: int, verse: int, tags: list[dict]) -> int:
     """Insert validated tag rows for one verse. Returns count written."""
     if not tags:
@@ -532,7 +611,49 @@ def validate_tag(raw: dict) -> dict | None:
 # Phase 1: Embeddings
 # ============================================================================
 
+def run_focus_embedding_phase(conn, client: OpenAI, stats: Stats) -> None:
+    """Embed the 24 focus_areas into focus_embeddings (migration 0013). Cheap
+    (24 rows, a single API call) and always run as part of the embed phase;
+    resumable via fetch_focus_areas_needing_embedding's LEFT JOIN filter, so
+    re-running the script never re-embeds a focus area that already has a
+    row."""
+    rows = fetch_focus_areas_needing_embedding(conn)
+    if not rows:
+        log.info("FOCUS EMBEDDINGS: nothing to do — all 24 focus areas already embedded.")
+        return
+    log.info("FOCUS EMBEDDINGS: %d focus area(s) need embedding (model=%s).", len(rows), EMBED_MODEL)
+
+    slugs = [r["slug"] for r in rows]
+    texts = [FOCUS_AREA_DESCRIPTIONS.get(r["slug"], r["label"]) for r in rows]
+
+    try:
+        resp = call_with_retries(
+            lambda: client.embeddings.create(model=EMBED_MODEL, input=texts),
+            what=f"embeddings.create (focus areas, batch of {len(texts)})",
+        )
+    except Exception as exc:  # noqa: BLE001
+        stats.embed_batches_failed += 1
+        log.error("FOCUS EMBEDDINGS: batch failed after retries, skipping: %s", exc)
+        return
+
+    vectors = [d.embedding for d in resp.data]
+    try:
+        upsert_focus_embeddings(conn, slugs, vectors)
+    except Exception as exc:  # noqa: BLE001
+        conn.rollback()
+        stats.embed_batches_failed += 1
+        log.error("FOCUS EMBEDDINGS: DB upsert failed, skipping: %s", exc)
+        return
+
+    if getattr(resp, "usage", None):
+        stats.embed_tokens += resp.usage.total_tokens
+    stats.focus_areas_embedded += len(rows)
+    log.info("FOCUS EMBEDDINGS: embedded %d focus area(s).", len(rows))
+
+
 def run_embedding_phase(conn, client: OpenAI, limit: int | None, stats: Stats) -> None:
+    run_focus_embedding_phase(conn, client, stats)
+
     verses = fetch_verses_needing_embedding(conn, limit)
     total = len(verses)
     if total == 0:
@@ -759,6 +880,7 @@ def main(argv: list[str] | None = None) -> int:
     log.info("=" * 72)
     log.info("SUMMARY")
     log.info("  verses embedded this run   : %d", stats.verses_embedded)
+    log.info("  focus areas embedded       : %d", stats.focus_areas_embedded)
     log.info("  verses tagged this run     : %d", stats.verses_considered_for_tagging)
     log.info("  tag rows written/updated   : %d", stats.tags_written)
     log.info("  invalid tags dropped       : %d", stats.tags_dropped_invalid)

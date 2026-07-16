@@ -205,7 +205,7 @@ struct TodayView: View {
                 .foregroundColor(.coInkTertiary)
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
-            if appState.todayVerseCuratedID != nil {
+            if appState.todayVerseBook != nil {
                 HStack(spacing: 16) {
                     verseFeedbackButton(title: "This spoke to me", signal: "spoke")
                     verseFeedbackButton(title: "Not for today", signal: "not_today")
@@ -218,9 +218,18 @@ struct TodayView: View {
     private func verseFeedbackButton(title: String, signal: String) -> some View {
         let given = verseFeedbackGiven == signal
         return Button {
-            guard let id = appState.todayVerseCuratedID else { return }
+            // Feedback is attributed by verse reference (book/chapter/verse),
+            // not curated_verse_id, so it works for AI-tagged verses too
+            // (record_verse_feedback's signature per migration 0013).
+            guard let book = appState.todayVerseBook,
+                  let chapter = appState.todayVerseChapter,
+                  let verse = appState.todayVerseVerse else { return }
             withAnimation(.easeOut(duration: 0.2)) { verseFeedbackGiven = signal }
-            Task { await SupabaseService.shared.sendVerseFeedback(curatedVerseId: id, signal: signal) }
+            Task {
+                await SupabaseService.shared.sendVerseFeedback(
+                    book: book, chapter: chapter, verse: verse, signal: signal
+                )
+            }
         } label: {
             Text(given ? "Thank you" : title)
                 .font(.coUI(11, weight: .medium))
