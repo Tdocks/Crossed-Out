@@ -268,35 +268,77 @@ HARD RULES — READ CAREFULLY:
    agricultural law is not secretly about "financial_wisdom" unless it is
    genuinely, contextually about stewardship, work, or provision.
 
-4. EMPTY IS CORRECT AND EXPECTED. Many verses are not devotionally
-   "applicable" in isolation: genealogies, census counts, tribal boundary
-   lists, dimensions of the tabernacle, ritual/ceremonial procedural detail,
-   itineraries, etc. For these, return an empty tags array. Do not stretch to
-   find a lesson that isn't really there. A healthy batch will often have
-   many empty results — that is success, not failure.
+4. OFFERS VS. MENTIONS — TAG WHAT THE VERSE OFFERS, NOT WHAT IT MERELY
+   MENTIONS. Assign a focus_slug/emotion ONLY if the verse, in its own
+   context, genuinely ministers to or addresses a reader who is in that
+   situation right now — never because it merely contains a matching
+   keyword. A verse describing GOD's OWN emotion (His grief, anger, or
+   jealousy), a character's sin, judgment, or punishment, or a plot event
+   is NOT a personal devotional verse for that feeling, even if it contains
+   words like "grief," "grieved," "bear," or "afraid." Ask yourself: does
+   this verse speak TO a struggling reader, or does it merely DESCRIBE
+   something that sounds similar to their struggle? Only the former earns a
+   tag.
 
-5. MULTIPLE TAGS ARE ALLOWED BUT SHOULD BE RARE. Most applicable verses get
+5. THE COMFORT BAR. Only apply an emotion tag with tone="comfort" (e.g.
+   grief, anxious, lonely, or overwhelmed used in a comforting sense) when
+   the verse actually offers the reader hope, a promise, God's nearness, or
+   consolation. Do NOT apply a comfort-tone emotional tag merely because the
+   verse depicts or names a negative emotion or a negative event — someone
+   else's despair, sin, or suffering in the text is not automatically
+   comfort for a reader carrying that same feeling.
+
+6. EMPTY IS CORRECT AND EXPECTED — NARRATIVE, GENEALOGY, AND LAW. Many
+   verses are not devotionally "applicable" in isolation: genealogies,
+   census counts, tribal boundary lists, dimensions of the tabernacle,
+   ritual/ceremonial procedural detail, itineraries, pure narrative plot
+   events, or legal/ceremonial statutes that carry no transferable promise
+   or instruction for today's reader. For these, return an empty tags
+   array. Do not stretch to find a lesson that isn't really there. When
+   genuinely torn between tagging and not tagging, do not tag —
+   under-tagging is strongly preferred to misapplying a tag. A healthy
+   batch will often have many empty results — that is success, not
+   failure.
+
+7. MULTIPLE TAGS ARE ALLOWED BUT SHOULD BE RARE. Most applicable verses get
    1 tag. Occasionally 2-3 is honest (e.g. a verse that is both about
    "grief" and "hopeful"/comfort). Do not tag every plausible focus area you
    can think of — only the ones a thoughtful reader would agree the verse is
    really about.
 
-6. theme is FREE TEXT (not controlled vocabulary): a short (3-8 word) plain
+8. theme is FREE TEXT (not controlled vocabulary): a short (3-8 word) plain
    description of the specific devotional point of this verse for this tag,
    e.g. "God's presence in exile" or "confessing sin honestly". Keep it
    grounded in what the verse actually says.
 
-7. confidence is a float from 0.0 to 1.0 reflecting how clearly and
+9. confidence is a float from 0.0 to 1.0 reflecting how clearly and
    uncontroversially the verse (in context) supports this tag. Reserve
    >=0.85 for verses that are unambiguously and directly about the topic.
    Use 0.5-0.74 for tags that are reasonable but more interpretive or
    context-dependent. If you are not at least moderately confident, omit
-   the tag rather than include it at low confidence.
+   the tag rather than include it at low confidence. Confidence reflects
+   how clear the match is — it is NOT a substitute for rules 4-6; a
+   keyword-driven mistake can still be stated at high confidence, so those
+   rules must be applied before confidence is even considered.
 
-8. THEOLOGICAL SOUNDNESS. Favor the plain, historic, mainstream Christian
-   reading of a text. Do not introduce sectarian, fringe, or speculative
-   theological claims. When a verse is genuinely ambiguous or disputed,
-   prefer fewer/safer tags over a confident-sounding but contestable one.
+10. THEOLOGICAL SOUNDNESS. Favor the plain, historic, mainstream Christian
+    reading of a text. Do not introduce sectarian, fringe, or speculative
+    theological claims. When a verse is genuinely ambiguous or disputed,
+    prefer fewer/safer tags over a confident-sounding but contestable one.
+
+11. GOOD VS. BAD EXAMPLES — anchor your judgment to these:
+    - GOOD: Genesis 2:24, "a man shall leave his father and mother and be
+      united to his wife" -> tag focus_slug="marriage". The verse itself
+      offers instruction about marriage to the reader.
+    - BAD: Genesis 6:6, "the LORD was grieved in His heart" -> do NOT tag
+      grief/comfort. This is GOD's own grief over human sin, not comfort
+      offered to a grieving reader.
+    - BAD: Genesis 4:13, Cain's "My punishment is greater than I can bear"
+      -> do NOT tag grief/comfort. This is an unrepentant character's
+      despair after judgment, not a verse ministering to the reader.
+    - BAD: Genesis 2:16, "you may eat freely from every tree" -> do NOT tag
+      temptation/anxious. This verse offers God's generous provision, not
+      a warning about temptation.
 
 OUTPUT FORMAT — STRICT JSON, NOTHING ELSE:
 Return a single JSON object of the shape:
@@ -526,7 +568,16 @@ def upsert_focus_embeddings(conn, slugs: list[str], vectors: list[list[float]]) 
 
 
 def upsert_tags(conn, book: str, chapter: int, verse: int, tags: list[dict]) -> int:
-    """Insert validated tag rows for one verse. Returns count written."""
+    """Insert validated tag rows for one verse. Returns count written.
+
+    review_status is ALWAYS 'pending' for AI-sourced tags, regardless of the
+    model's stated confidence. Confidence is stored for reference/sorting,
+    but it is not a reliable signal of theological correctness (see the
+    keyword-driven mis-tagging cases in TAGGING_SYSTEM_PROMPT's GOOD VS. BAD
+    examples — those were all reported at confidence=0.85). Promotion from
+    'pending' to 'approved' happens only through a separate human/editorial
+    review pass, never automatically here.
+    """
     if not tags:
         return 0
     rows = [
@@ -534,7 +585,7 @@ def upsert_tags(conn, book: str, chapter: int, verse: int, tags: list[dict]) -> 
             book, chapter, verse,
             t["focus_slug"], t.get("emotion"), t.get("tone"), t.get("maturity"),
             t.get("theme"), t["confidence"],
-            "approved" if t["confidence"] >= 0.75 else "pending",
+            "pending",  # never auto-approve; see docstring above
         )
         for t in tags
     ]
