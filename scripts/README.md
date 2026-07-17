@@ -228,7 +228,123 @@ delete from verse_tags where source = 'ai' and book = 'Genesis' and chapter = 1 
 delete from ai_tag_progress where book = 'Genesis' and chapter = 1 and verse = 1;
 ```
 
+## Review pass
+
+`review_tags.py` is a strict second-pass reviewer over the AI tags
+`tag_bible.py` writes. Tagging always writes `review_status='pending'` —
+this script re-reads each pending tag against the actual verse text and
+either promotes it to `'approved'` (only `'approved'` tags are ever used by
+the recommendation engine — see `recommend_today_verse` / 0013's blend
+engine) or demotes it to `'rejected'`, recording why in the `review_note`
+column. It never touches `source='curated'` rows — those were seeded
+already-`'approved'` in migration `0012` and stay that way.
+
+The tagging model has a known lean toward keyword-driven mistakes — e.g.
+tagging a character's judgment/despair (Cain's "my punishment is greater
+than I can bear") or God's own emotion ("the LORD was grieved in His
+heart") as personal grief/comfort, or tagging `tone=comfort` onto
+confrontation, warning, or fear-depicting verses just because they mention
+a matching feeling. The reviewer prompt is built specifically to catch
+these — see `REVIEWER_SYSTEM_PROMPT` in `review_tags.py` for the full rule
+set. When a case is genuinely borderline, the reviewer is instructed to
+reject: a mis-served verse is worse than a missing one.
+
+### Prerequisites
+
+1. **Migration `0015_review_notes.sql` must be applied first** — it adds
+   the `review_note text` column to `verse_tags` that this script writes
+   to. Apply it the same way you apply the rest of `supabase/migrations/`.
+2. A tagging run (`tag_bible.py`) should already have written the
+   `source='ai'`, `review_status='pending'` rows this script reviews —
+   there's nothing to do until those exist.
+3. Same Python dependencies as `tag_bible.py` (`pip3 install openai
+   "psycopg[binary]"`) — already installed if you've run the tagging
+   script.
+
+### Environment variables
+
+- **`DATABASE_URL`** — same Supabase session pooler connection string used
+  for `tag_bible.py`.
+- **`OPENAI_API_KEY`** — same key as `tag_bible.py`.
+- **`OPENAI_BASE_URL`** (optional) — same meaning as `tag_bible.py`.
+- **`REVIEW_MODEL`** (optional, default `gpt-4o-mini`) — the chat model used
+  for review. **A stronger model (e.g. `gpt-4o`, `gpt-4.1`) gives better
+  theological judgment on borderline cases** and is worth the extra cost
+  for this pass even if `gpt-4o-mini` was used for the original tagging —
+  precision matters more here, since this is the last check before a tag
+  reaches a real user. If you change it, update `CHAT_PRICE_PER_1M_TOKENS`
+  in `review_tags.py` for an accurate running cost estimate.
+
+### Running it
+
+Cheap test pass first — look at what gets approved/rejected and why before
+trusting a full run:
+
+```bash
+cd "/Users/tylerdockswell/Projects/Crossed Out /"
+export DATABASE_URL="postgresql://postgres.xxxx:PASSWORD@aws-0-region.pooler.supabase.com:5432/postgres"
+export OPENAI_API_KEY="sk-...copied-from-supabase/.env.local..."
+# optional: export REVIEW_MODEL="gpt-4o"
+python3 scripts/review_tags.py --limit 200
+```
+
+Then the full pass over every remaining pending AI tag:
+
+```bash
+python3 scripts/review_tags.py
+```
+
+It's resumable and idempotent: only `source='ai' AND review_status='pending'`
+rows are ever selected, so re-running after a crash/Ctrl-C, or after a later
+`tag_bible.py` run adds more pending tags, is always safe — already-reviewed
+rows are never re-touched. A batch that errors (API failure, malformed
+JSON) is logged and skipped rather than crashing the run; those rows stay
+`'pending'` and are retried on the next run.
+
+The script prints progress and a running `$` cost estimate as it goes, and
+a final summary of approved/rejected counts overall **and per
+`focus_slug`**, so a systematically over-rejected or problem focus area is
+visible immediately rather than buried in aggregate numbers.
+
+### Inspecting results in SQL
+
+```sql
+-- overall breakdown
+select review_status, count(*)
+from verse_tags
+where source = 'ai'
+group by review_status;
+
+-- per-focus breakdown, to spot a focus area with unusually high rejection
+select focus_slug, review_status, count(*)
+from verse_tags
+where source = 'ai'
+group by focus_slug, review_status
+order by focus_slug, review_status;
+
+-- read a sample of rejections and why
+select book, chapter, verse, focus_slug, emotion, tone, review_note
+from verse_tags
+where source = 'ai' and review_status = 'rejected'
+order by book, chapter, verse
+limit 50;
+
+-- read a sample of approvals and why
+select book, chapter, verse, focus_slug, emotion, tone, review_note
+from verse_tags
+where source = 'ai' and review_status = 'approved'
+order by book, chapter, verse
+limit 50;
+```
+
+**Only `review_status='approved'` tags are used by the recommendation
+engine.** `'pending'` tags (not yet reviewed) and `'rejected'` tags
+(reviewed and declined) are never surfaced to users — this review pass is
+what promotes a tag from "the tagging model's guess" to "vetted for
+production."
+
 ## Files
 
-- `scripts/tag_bible.py` — the pipeline.
+- `scripts/tag_bible.py` — the AI embedding + tagging pipeline.
+- `scripts/review_tags.py` — the strict second-pass reviewer.
 - `scripts/README.md` — this file.
