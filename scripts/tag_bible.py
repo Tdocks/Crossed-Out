@@ -21,6 +21,13 @@ defined by migrations 0012_semantic_and_tags.sql and 0013_blend_engine.sql:
      verses that are not genuinely devotional/applicable (e.g. genealogies,
      census lists, ceremonial-law measurements). Rows are validated against
      the controlled vocab and upserted into verse_tags with source='ai'.
+     Batches are dispatched to the OpenAI API concurrently (ThreadPoolExecutor,
+     TAG_CONCURRENCY workers, default 8) since the bottleneck is the API
+     round-trip latency, not CPU or the DB. Worker threads do ONLY the API
+     call + JSON parse + vocab validation; every DB write (verse_tags
+     upserts, ai_tag_progress bookkeeping) happens back on the main thread as
+     results land via concurrent.futures.as_completed(), so the single
+     psycopg connection is never touched from more than one thread.
 
   3. FOCUS AREA EMBEDDINGS — as part of the embed phase (step 1), also embeds
      the 24 focus_areas (migration 0013_blend_engine.sql's focus_embeddings
@@ -90,6 +97,14 @@ ENVIRONMENT VARIABLES
   TAG_MODEL        optional. Default: gpt-4o-mini. Can be overridden to any
                     chat-completions-compatible model, including your own
                     fine-tune, as long as it supports response_format=json_object.
+  TAG_CONCURRENCY  optional. Default: 8. Number of tagging batches sent to the
+                    OpenAI chat API concurrently via a ThreadPoolExecutor. The
+                    tagging phase is API-latency-bound (not CPU/DB-bound), so
+                    running N batches in flight at once gives roughly an Nx
+                    wall-clock speedup. DB writes stay single-threaded/safe —
+                    worker threads only do the API call + JSON parse +
+                    controlled-vocab validation; all verse_tags/ai_tag_progress
+                    writes happen back on the main thread.
 
 See scripts/README.md for install steps, cost/runtime estimates, and how to
 review a sample of tags in SQL before committing to the full run.
@@ -98,6 +113,7 @@ review a sample of tags in SQL before committing to the full run.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import itertools
 import json
 import logging
@@ -202,6 +218,16 @@ TAG_MODEL = os.environ.get("TAG_MODEL", "gpt-4o-mini")
 EMBED_DIMENSIONS = 1536
 EMBED_BATCH_SIZE = 1000  # OpenAI embeddings API accepts up to 2048 inputs/call; 1000 is a safe margin
 TAG_BATCH_SIZE = 18      # ~15-20 verses per chat call, per spec
+
+# Tagging is API-latency-bound, not CPU/DB-bound (each ~18-verse batch just
+# waits ~9-10s on the OpenAI round-trip), so batches are dispatched to a
+# ThreadPoolExecutor of this many workers. Each worker does ONLY the OpenAI
+# call + JSON parse + controlled-vocab validation — no DB access happens on
+# worker threads. All DB writes (verse_tags upserts, ai_tag_progress) happen
+# back on the main thread as results come in via as_completed(), keeping the
+# single psycopg connection single-threaded/safe. Override via env if you
+# hit OpenAI rate limits, or raise it if your account tier allows more.
+TAG_CONCURRENCY = int(os.environ.get("TAG_CONCURRENCY", "8"))
 
 MAX_RETRIES = 5
 RETRY_BASE_DELAY = 1.5  # seconds, exponential backoff w/ jitter
@@ -755,6 +781,106 @@ def _verse_ref_key(book: str, chapter: int, verse: int) -> tuple:
     return (book, int(chapter), int(verse))
 
 
+@dataclass
+class TagBatchResult:
+    """Everything the main thread needs to write one tagged batch to the DB.
+    Produced entirely on a worker thread — no DB access involved in building
+    one of these."""
+    batch: list[dict]
+    by_key: dict
+    entries: list[dict] | None  # None iff error is set
+    input_tokens: int
+    output_tokens: int
+    error: str | None = None
+
+
+def _tag_one_batch(client: OpenAI, batch: list[dict]) -> TagBatchResult:
+    """Worker function: runs on a ThreadPoolExecutor thread. Does ONLY the
+    OpenAI chat call, JSON parsing, and controlled-vocab validation — it
+    never opens a DB cursor or touches `conn`. All DB writes happen back on
+    the main thread in run_tagging_phase() once this result comes back
+    through concurrent.futures.as_completed(), so the single psycopg
+    connection is only ever used from one thread at a time."""
+    by_key = {_verse_ref_key(v["book"], v["chapter"], v["verse"]): v for v in batch}
+    payload = [
+        {"ref": f'{v["book"]} {v["chapter"]}:{v["verse"]}',
+         "book": v["book"], "chapter": v["chapter"], "verse": v["verse"],
+         "text": v["text"]}
+        for v in batch
+    ]
+    messages = [
+        {"role": "system", "content": TAGGING_SYSTEM_PROMPT},
+        {"role": "user", "content": json.dumps({"verses": payload}, ensure_ascii=False)},
+    ]
+
+    try:
+        resp = call_with_retries(
+            lambda: client.chat.completions.create(
+                model=TAG_MODEL,
+                messages=messages,
+                response_format={"type": "json_object"},
+                temperature=0,
+            ),
+            what=f"chat.completions.create (batch of {len(batch)})",
+        )
+    except Exception as exc:  # noqa: BLE001
+        return TagBatchResult(
+            batch=batch, by_key=by_key, entries=None,
+            input_tokens=0, output_tokens=0,
+            error=f"API call failed after retries: {exc}",
+        )
+
+    input_tokens = 0
+    output_tokens = 0
+    if getattr(resp, "usage", None):
+        input_tokens = resp.usage.prompt_tokens or 0
+        output_tokens = resp.usage.completion_tokens or 0
+
+    raw_content = resp.choices[0].message.content
+    try:
+        parsed = json.loads(raw_content)
+        results = parsed.get("results", [])
+        if not isinstance(results, list):
+            raise ValueError("'results' is not a list")
+    except Exception as exc:  # noqa: BLE001
+        return TagBatchResult(
+            batch=batch, by_key=by_key, entries=None,
+            input_tokens=input_tokens, output_tokens=output_tokens,
+            error=f"could not parse model JSON: {exc}",
+        )
+
+    # Controlled-vocab validation also happens here (still no DB access) —
+    # the main thread just writes whatever comes out of this.
+    entries: list[dict] = []
+    for entry in results:
+        try:
+            key = _verse_ref_key(entry["book"], entry["chapter"], entry["verse"])
+        except (KeyError, TypeError, ValueError):
+            entries.append({"malformed": True, "raw": entry})
+            continue
+
+        raw_tags = entry.get("tags") or []
+        valid_tags = []
+        dropped_invalid = 0
+        for raw_tag in raw_tags:
+            validated = validate_tag(raw_tag)
+            if validated is None:
+                dropped_invalid += 1
+                log.debug("TAGGING: dropped invalid tag %r for %s", raw_tag, key)
+                continue
+            valid_tags.append(validated)
+        entries.append({
+            "malformed": False, "key": key,
+            "valid_tags": valid_tags, "dropped_invalid": dropped_invalid,
+        })
+
+    return TagBatchResult(
+        batch=batch, by_key=by_key, entries=entries,
+        input_tokens=input_tokens, output_tokens=output_tokens,
+        error=None,
+    )
+
+
 def run_tagging_phase(conn, client: OpenAI, limit: int | None, stats: Stats) -> None:
     has_progress_table = ensure_progress_table(conn)
     verses = fetch_verses_needing_tags(conn, limit, has_progress_table)
@@ -764,109 +890,89 @@ def run_tagging_phase(conn, client: OpenAI, limit: int | None, stats: Stats) -> 
         return
     log.info("TAGGING: %d verses need tagging (model=%s).", total, TAG_MODEL)
 
+    batches = list(chunked(verses, TAG_BATCH_SIZE))
+    log.info(
+        "TAGGING: %d batch(es) queued, concurrency=%d (TAG_CONCURRENCY).",
+        len(batches), TAG_CONCURRENCY,
+    )
+
+    # Workers ONLY do the OpenAI call + JSON parse + vocab validation (no DB
+    # access — see _tag_one_batch). We consume completed batches here on the
+    # main thread via as_completed() and do every DB write (verse_tags
+    # upserts, ai_tag_progress, commits) single-threaded, so the one psycopg
+    # connection is never shared across threads. The running cost counter
+    # (stats) is likewise only ever mutated here on the main thread.
     done = 0
-    for batch in chunked(verses, TAG_BATCH_SIZE):
-        by_key = {_verse_ref_key(v["book"], v["chapter"], v["verse"]): v for v in batch}
-        payload = [
-            {"ref": f'{v["book"]} {v["chapter"]}:{v["verse"]}',
-             "book": v["book"], "chapter": v["chapter"], "verse": v["verse"],
-             "text": v["text"]}
-            for v in batch
-        ]
-        messages = [
-            {"role": "system", "content": TAGGING_SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps({"verses": payload}, ensure_ascii=False)},
-        ]
-
-        try:
-            resp = call_with_retries(
-                lambda: client.chat.completions.create(
-                    model=TAG_MODEL,
-                    messages=messages,
-                    response_format={"type": "json_object"},
-                    temperature=0,
-                ),
-                what=f"chat.completions.create (batch of {len(batch)})",
-            )
-        except Exception as exc:  # noqa: BLE001
-            stats.tag_batches_failed += 1
-            log.error(
-                "TAGGING: batch of %d verses failed after retries, skipping "
-                "(will retry on next --resume run): %s",
-                len(batch), exc,
-            )
-            continue
-
-        if getattr(resp, "usage", None):
-            stats.tag_input_tokens += resp.usage.prompt_tokens or 0
-            stats.tag_output_tokens += resp.usage.completion_tokens or 0
-
-        raw_content = resp.choices[0].message.content
-        try:
-            parsed = json.loads(raw_content)
-            results = parsed.get("results", [])
-            if not isinstance(results, list):
-                raise ValueError("'results' is not a list")
-        except Exception as exc:  # noqa: BLE001
-            stats.tag_batches_failed += 1
-            log.error(
-                "TAGGING: could not parse model JSON for batch of %d verses, "
-                "skipping (will retry on next --resume run): %s",
-                len(batch), exc,
-            )
-            continue
-
-        seen_keys: set = set()
-        batch_tags_written = 0
-        for entry in results:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=TAG_CONCURRENCY) as executor:
+        future_to_batch = {
+            executor.submit(_tag_one_batch, client, batch): batch for batch in batches
+        }
+        for future in concurrent.futures.as_completed(future_to_batch):
+            batch = future_to_batch[future]
             try:
-                key = _verse_ref_key(entry["book"], entry["chapter"], entry["verse"])
-            except (KeyError, TypeError, ValueError):
-                log.warning("TAGGING: dropping malformed result entry: %r", entry)
+                result = future.result()
+            except Exception as exc:  # noqa: BLE001 - defensive: worker should not raise
+                stats.tag_batches_failed += 1
+                log.error(
+                    "TAGGING: worker crashed for batch of %d verses, skipping "
+                    "(will retry on next --resume run): %s",
+                    len(batch), exc,
+                )
                 continue
-            if key not in by_key:
-                log.warning("TAGGING: model returned unrequested verse %s, ignoring.", key)
-                continue
-            seen_keys.add(key)
 
-            raw_tags = entry.get("tags") or []
-            valid_tags = []
-            for raw_tag in raw_tags:
-                validated = validate_tag(raw_tag)
-                if validated is None:
-                    stats.tags_dropped_invalid += 1
-                    log.debug("TAGGING: dropped invalid tag %r for %s", raw_tag, key)
+            stats.tag_input_tokens += result.input_tokens
+            stats.tag_output_tokens += result.output_tokens
+
+            if result.error is not None:
+                stats.tag_batches_failed += 1
+                log.error(
+                    "TAGGING: batch of %d verses failed, skipping "
+                    "(will retry on next --resume run): %s",
+                    len(result.batch), result.error,
+                )
+                continue
+
+            seen_keys: set = set()
+            batch_tags_written = 0
+            for entry in result.entries:
+                if entry["malformed"]:
+                    log.warning("TAGGING: dropping malformed result entry: %r", entry["raw"])
                     continue
-                valid_tags.append(validated)
+                key = entry["key"]
+                if key not in result.by_key:
+                    log.warning("TAGGING: model returned unrequested verse %s, ignoring.", key)
+                    continue
+                seen_keys.add(key)
+                stats.tags_dropped_invalid += entry["dropped_invalid"]
 
-            book, chapter, verse = key
-            try:
-                written = upsert_tags(conn, book, chapter, verse, valid_tags)
-                if has_progress_table:
-                    mark_progress(conn, book, chapter, verse, len(valid_tags))
-                conn.commit()
-            except Exception as exc:  # noqa: BLE001
-                conn.rollback()
-                log.error("TAGGING: DB write failed for %s, skipping: %s", key, exc)
-                continue
-            batch_tags_written += written
-            stats.tags_written += written
-            stats.verses_considered_for_tagging += 1
+                book, chapter, verse = key
+                try:
+                    written = upsert_tags(conn, book, chapter, verse, entry["valid_tags"])
+                    if has_progress_table:
+                        mark_progress(conn, book, chapter, verse, len(entry["valid_tags"]))
+                    conn.commit()
+                except Exception as exc:  # noqa: BLE001
+                    conn.rollback()
+                    log.error("TAGGING: DB write failed for %s, skipping: %s", key, exc)
+                    continue
+                batch_tags_written += written
+                stats.tags_written += written
+                stats.verses_considered_for_tagging += 1
 
-        missing = set(by_key) - seen_keys
-        if missing:
-            log.warning(
-                "TAGGING: model omitted %d/%d verses from this batch's response; "
-                "they will be retried on the next --resume run: %s",
-                len(missing), len(batch), sorted(missing),
+            missing = set(result.by_key) - seen_keys
+            if missing:
+                log.warning(
+                    "TAGGING: model omitted %d/%d verses from this batch's response; "
+                    "they will be retried on the next --resume run: %s",
+                    len(missing), len(result.batch), sorted(missing),
+                )
+
+            done += len(seen_keys)
+            log.info(
+                "tagged %d/%d verses considered, %d tags written this batch "
+                "(running tag cost ~$%.4f)",
+                done, total, batch_tags_written, stats.tag_cost(),
             )
-
-        done += len(seen_keys)
-        log.info(
-            "tagged %d/%d verses considered, %d tags written this batch "
-            "(running tag cost ~$%.4f)",
-            done, total, batch_tags_written, stats.tag_cost(),
-        )
 
 
 # ============================================================================

@@ -64,6 +64,15 @@ the code.
   `response_format={"type": "json_object"}`. If you change it, also update
   `CHAT_PRICE_PER_1M_TOKENS` in the script if you want accurate cost
   estimates for that model.
+- **`TAG_CONCURRENCY`** (optional, default `8`) — the tagging phase is
+  bottlenecked on the OpenAI API round-trip (~9-10s per ~18-verse batch),
+  not CPU or the DB, so tagging batches now run concurrently on a
+  `ThreadPoolExecutor` with this many workers. Each worker does only the
+  API call + JSON parse + controlled-vocab validation; every DB write
+  (`verse_tags` upserts, `ai_tag_progress` bookkeeping) still happens
+  serialized on the main thread, so this is safe to raise without risking
+  concurrent writes on the single DB connection. Lower it if you hit
+  OpenAI rate limits; raise it if your account tier has headroom.
 
 Set them for your shell session, e.g.:
 
@@ -188,10 +197,17 @@ python3 scripts/tag_bible.py --tag-only
 
 ### Expected runtime
 
-Sequential, batched, rate-limit-friendly (no aggressive concurrency): expect
-roughly **1-3 hours** for the full Bible end to end, depending on API
-latency and how many batches need retries. Embeddings finish much faster
-than tagging (32 batches of ≤1000 vs. ~1,730 tagging batches of ~18).
+Embeddings finish fast (32 batches of ≤1000). Tagging is the long pole
+(~1,730 batches of ~18 verses), and each batch call takes roughly ~9-10s of
+API round-trip time — that's the bottleneck, not CPU or the DB. Tagging
+batches now run concurrently via a `ThreadPoolExecutor` (`TAG_CONCURRENCY`
+workers, default 8), so wall-clock time for the tagging phase drops
+roughly `TAG_CONCURRENCY`-fold versus running batches one at a time — at
+the default of 8 workers, expect the full Bible to finish in on the order
+of **30-45 minutes** rather than several hours, depending on API latency,
+rate limits, and how many batches need retries. Raise `TAG_CONCURRENCY` for
+more speedup if your OpenAI account tier has the rate-limit headroom; lower
+it if you start seeing 429s.
 
 ## Re-running safely
 
