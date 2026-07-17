@@ -120,7 +120,22 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL") or None
 REVIEW_MODEL = os.environ.get("REVIEW_MODEL", "gpt-4o-mini")
 
+# Reasoning effort for reasoning-class models only (gpt-5.x, o-series,
+# *luna). Verified live: gpt-5.2 rejects reasoning_effort='minimal' but
+# accepts 'low', and 'low' is fast + high quality for this batch-classify
+# task. Never sent for classic gpt-4o-class models.
+REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "low")
+
 REVIEW_BATCH_SIZE = 18  # ~15-20 tags per chat call, same convention as tag_bible.py
+
+# Output token cap for the review chat call (JSON results for a batch of up
+# to REVIEW_BATCH_SIZE tags: index/approve/reason per item). Neither this
+# script nor tag_bible.py previously capped output tokens at all; 4000 gives
+# generous headroom for a full batch's JSON response plus low-effort
+# reasoning tokens on reasoning-class models, without being needlessly
+# large. Passed as max_completion_tokens for reasoning-class models and
+# max_tokens for classic models — see _model_is_reasoning().
+REVIEW_MAX_TOKENS = 4000
 
 # The review phase is API-latency-bound, not CPU/DB-bound (each ~18-tag
 # batch just waits on the OpenAI round-trip), so batches are dispatched to a
@@ -352,6 +367,18 @@ def chunked(seq: list, size: int) -> Iterator[list]:
         yield batch
 
 
+def _model_is_reasoning(model: str) -> bool:
+    """True for OpenAI reasoning-class models (gpt-5.x, the o-series —
+    o1/o3/o4 — and any *luna model), which reject the classic chat params:
+    they require max_completion_tokens instead of max_tokens, and only
+    support the default temperature (1) — passing temperature=0 raises
+    "'temperature' does not support 0 ... Only the default (1) value is
+    supported". Classic models (gpt-4o, gpt-4o-mini, gpt-4.1, ...) still use
+    max_tokens + temperature as before."""
+    name = (model or "").lower()
+    return name.startswith(("gpt-5", "o1", "o3", "o4")) or "luna" in name
+
+
 def call_with_retries(fn, what: str, max_retries: int = MAX_RETRIES):
     """Call fn() with exponential backoff + jitter. Raises the last exception
     if all retries are exhausted, so the caller can log-and-continue."""
@@ -465,14 +492,26 @@ def _review_one_batch(client: OpenAI, batch: list[dict]) -> ReviewBatchResult:
         {"role": "user", "content": json.dumps({"items": payload}, ensure_ascii=False)},
     ]
 
+    # Reasoning-class models (gpt-5.x, o-series, *luna) require
+    # max_completion_tokens and reject max_tokens; they also only support the
+    # default temperature (1) and reject temperature=0. Classic models
+    # (gpt-4o, gpt-4o-mini, gpt-4.1, ...) keep using max_tokens + temperature
+    # as before. See _model_is_reasoning().
+    params = {
+        "model": REVIEW_MODEL,
+        "messages": messages,
+        "response_format": {"type": "json_object"},
+    }
+    if _model_is_reasoning(REVIEW_MODEL):
+        params["max_completion_tokens"] = REVIEW_MAX_TOKENS
+        params["reasoning_effort"] = REASONING_EFFORT
+    else:
+        params["max_tokens"] = REVIEW_MAX_TOKENS
+        params["temperature"] = 0
+
     try:
         resp = call_with_retries(
-            lambda: client.chat.completions.create(
-                model=REVIEW_MODEL,
-                messages=messages,
-                response_format={"type": "json_object"},
-                temperature=0,
-            ),
+            lambda: client.chat.completions.create(**params),
             what=f"chat.completions.create (review batch of {len(batch)})",
         )
     except Exception as exc:  # noqa: BLE001
