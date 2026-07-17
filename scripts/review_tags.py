@@ -179,6 +179,18 @@ something that sounds similar. Ask: does this verse offer something to a
 reader carrying this focus/emotion right now, or does it merely mention,
 narrate, or depict something adjacent to it? Only the former is a pass.
 
+COMFORT TEST SCOPE — DO NOT OVER-APPLY:
+The "offers comfort/consolation" reading applies ONLY when the row's tone
+is 'comfort'. When tone is 'instruction' or 'challenge' (or blank/absent),
+NEVER reject a tag on the grounds that the verse "does not provide
+comfort" or "offers no consolation" — that test is out of scope for those
+rows. For tone='instruction' or 'challenge' rows, judge instead whether the
+verse genuinely instructs, exhorts, warns, or challenges a reader on that
+focus in context. A verse can be sound instruction (e.g. a command to
+trust, persevere, be self-controlled, or examine Scripture) without
+offering any comfort at all — that is not a defect and is not grounds for
+rejection.
+
 REJECTION RULES — REJECT the tag if any of these apply:
 
 1. CHARACTER-IN-JUDGMENT MISREAD AS COMFORT. The verse depicts a character
@@ -220,6 +232,41 @@ REJECTION RULES — REJECT the tag if any of these apply:
    and the focus_slug depends on a shared word or surface similarity
    rather than the verse's actual meaning in context, REJECT.
 
+6. OT COVENANT / NATIONAL PROMISE MISAPPLIED TO A PERSONAL FOCUS. The verse
+   is a covenant or national promise made to Israel, Jacob, Zion, or a
+   patriarch — about nationhood, land, descendants, or corporate
+   restoration — and it is tagged onto a PERSONAL focus like purpose,
+   marriage, or parenting. REJECT unless the verse carries a genuinely
+   transferable personal truth, not a typological or allegorical stretch.
+   God-as-bridegroom / Zion-as-bride imagery (e.g. Isaiah 62:5, Jeremiah
+   3:1) is NOT human-marriage counsel. "Be fruitful and multiply" (Genesis
+   9:1) is a command to a nation/humanity to repopulate the earth, NOT
+   parenting instruction. A patriarch's descendants-as-numerous promise
+   (e.g. Genesis 35:11, Isaiah 65:9) is NOT a personal statement about the
+   reader's own purpose.
+
+7. SPEECH FROM A REBUKED, UNRELIABLE, OR VILLAINOUS SPEAKER PRESENTED AS
+   SOUND TEACHING. If the verse is words spoken by a character the text
+   itself discredits — e.g. Job's friends Eliphaz, Bildad, or Zophar (whom
+   God explicitly rebukes in Job 42:7), Haman's spiteful boasting (Esther
+   5:13), Jacob's dying rebuke of Simeon and Levi (Genesis 49:7), or any
+   other character's sinful, despairing, or false words — REJECT treating
+   that speech as instruction or comfort for the reader, unless the verse
+   is clearly narrator-endorsed or otherwise plainly sound teaching in
+   context. This also covers narration of a character's sinful or
+   despairing ACT presented as guidance (e.g. Moses smashing the tablets
+   in anger, Exodus 32:19, tagged as anger guidance) — narrating that
+   someone acted in anger is not instruction about anger.
+
+8. BARE NARRATIVE MENTION WITH NO TRANSFERABLE CONTENT. The verse merely
+   reports that a character did something — prayed, was angry, obeyed a
+   command — using a keyword that matches the focus/emotion, but offers no
+   instruction, principle, or comfort a reader can actually take away.
+   REJECT. Example: Genesis 6:22 ("Noah did everything just as God
+   commanded him") tagged discipline, or Acts 20:7 (the church "gathered
+   to break bread") tagged relationships — both are bare narration, not
+   reader-facing teaching.
+
 WHEN BORDERLINE, REJECT. Precision over recall: a mis-served verse shown to
 a real person in crisis is worse than a missing tag. If you are genuinely
 torn between approve and reject, reject. Do not give the benefit of the
@@ -231,6 +278,27 @@ sound, plainly-applicable tags get rejected too. Genesis 2:24 ("a man shall
 leave his father and mother and be united to his wife") tagged marriage —
 APPROVE, this is genuine instruction about marriage. The goal is precision,
 not zero approvals.
+
+CONSISTENCY: Judge each verse strictly on its own merits against the rules
+above, independent of any other item in the batch. Near-duplicate or
+thematically similar verses reviewed against these same rules should reach
+the same verdict every time.
+
+GOOD vs. BAD ANCHOR EXAMPLES:
+- Matthew 6:30 ("will He not much more clothe you"), tone=instruction,
+  focus=anxiety — APPROVE. This instructs/reassures within its own tone;
+  do not reject it for "not offering comfort" (comfort test does not apply
+  to tone=instruction rows — see COMFORT TEST SCOPE above).
+- Titus 2:2 ("older men are to be ... self-controlled"), tone=instruction,
+  focus=discipline — APPROVE. Genuine instruction; the absence of comfort
+  is irrelevant on a tone=instruction row.
+- Genesis 35:11 ("be fruitful and multiply ... kings will descend from
+  you"), focus=purpose — REJECT. A national/covenant promise to Jacob
+  about descendants, not a personal statement of the reader's own purpose
+  (rule 6).
+- Job 18:4 (Bildad's speech), any focus — REJECT. Bildad is one of the
+  friends God explicitly rebukes in Job 42:7; his words are not sound
+  teaching for a reader (rule 7).
 
 OUTPUT FORMAT — STRICT JSON, NOTHING ELSE:
 Return a single JSON object of the shape:
