@@ -53,6 +53,22 @@ ENVIRONMENT VARIABLES
                     initial tagging, since precision matters more here than
                     in the first pass. Must support response_format=
                     json_object.
+  REVIEW_CONCURRENCY  optional. Default: 8. Number of review batches sent to
+                    the OpenAI chat API concurrently via a
+                    ThreadPoolExecutor. The review phase is API-latency-bound
+                    (not CPU/DB-bound), so running N batches in flight at
+                    once gives roughly an Nx wall-clock speedup. DB writes
+                    stay single-threaded/safe — worker threads only do the
+                    API call + JSON parse; all review_status/review_note
+                    UPDATEs happen back on the main thread.
+
+Review batches are dispatched to the OpenAI API concurrently
+(ThreadPoolExecutor, REVIEW_CONCURRENCY workers, default 8) since the
+bottleneck is the API round-trip latency, not CPU or the DB. Worker threads
+do ONLY the API call + JSON parse — every DB write (the review_status +
+review_note UPDATE) happens back on the main thread as results land via
+concurrent.futures.as_completed(), so the single psycopg connection is
+never touched from more than one thread.
 
 See scripts/README.md for prerequisites (apply migration 0015 first), the
 review workflow, and sample SQL to inspect results.
@@ -61,6 +77,7 @@ review workflow, and sample SQL to inspect results.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import itertools
 import json
 import logging
@@ -104,6 +121,17 @@ OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL") or None
 REVIEW_MODEL = os.environ.get("REVIEW_MODEL", "gpt-4o-mini")
 
 REVIEW_BATCH_SIZE = 18  # ~15-20 tags per chat call, same convention as tag_bible.py
+
+# The review phase is API-latency-bound, not CPU/DB-bound (each ~18-tag
+# batch just waits on the OpenAI round-trip), so batches are dispatched to a
+# ThreadPoolExecutor of this many workers. Each worker does ONLY the OpenAI
+# call + JSON parse — no DB access happens on worker threads. All DB writes
+# (the review_status/review_note UPDATE) happen back on the main thread as
+# results come in via as_completed(), keeping the single psycopg connection
+# single-threaded/safe. Override via env if you hit OpenAI rate limits, or
+# raise it if your account tier allows more. Same pattern as tag_bible.py's
+# TAG_CONCURRENCY.
+REVIEW_CONCURRENCY = int(os.environ.get("REVIEW_CONCURRENCY", "8"))
 
 MAX_RETRIES = 5
 RETRY_BASE_DELAY = 1.5  # seconds, exponential backoff w/ jitter
@@ -332,6 +360,86 @@ def _row_ref_key(row: dict) -> str:
     return f'{row["book"]} {row["chapter"]}:{row["verse"]}'
 
 
+@dataclass
+class ReviewBatchResult:
+    """Everything the main thread needs to write one reviewed batch to the
+    DB. Produced entirely on a worker thread — no DB access involved in
+    building one of these."""
+    batch: list[dict]
+    by_index: dict
+    results: list[dict] | None  # None iff error is set
+    input_tokens: int
+    output_tokens: int
+    error: str | None = None
+
+
+def _review_one_batch(client: OpenAI, batch: list[dict]) -> ReviewBatchResult:
+    """Worker function: runs on a ThreadPoolExecutor thread. Does ONLY the
+    OpenAI chat call and JSON parsing — it never opens a DB cursor or
+    touches `conn`. All DB writes happen back on the main thread in
+    run_review_phase() once this result comes back through
+    concurrent.futures.as_completed(), so the single psycopg connection is
+    only ever used from one thread at a time."""
+    by_index = {i: row for i, row in enumerate(batch)}
+    payload = [
+        {
+            "index": i,
+            "ref": _row_ref_key(row),
+            "verse_text": row["text"],
+            "focus_slug": row["focus_slug"],
+            "emotion": row["emotion"],
+            "tone": row["tone"],
+        }
+        for i, row in by_index.items()
+    ]
+    messages = [
+        {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+        {"role": "user", "content": json.dumps({"items": payload}, ensure_ascii=False)},
+    ]
+
+    try:
+        resp = call_with_retries(
+            lambda: client.chat.completions.create(
+                model=REVIEW_MODEL,
+                messages=messages,
+                response_format={"type": "json_object"},
+                temperature=0,
+            ),
+            what=f"chat.completions.create (review batch of {len(batch)})",
+        )
+    except Exception as exc:  # noqa: BLE001
+        return ReviewBatchResult(
+            batch=batch, by_index=by_index, results=None,
+            input_tokens=0, output_tokens=0,
+            error=f"API call failed after retries: {exc}",
+        )
+
+    input_tokens = 0
+    output_tokens = 0
+    if getattr(resp, "usage", None):
+        input_tokens = resp.usage.prompt_tokens or 0
+        output_tokens = resp.usage.completion_tokens or 0
+
+    raw_content = resp.choices[0].message.content
+    try:
+        parsed = json.loads(raw_content)
+        results = parsed.get("results", [])
+        if not isinstance(results, list):
+            raise ValueError("'results' is not a list")
+    except Exception as exc:  # noqa: BLE001
+        return ReviewBatchResult(
+            batch=batch, by_index=by_index, results=None,
+            input_tokens=input_tokens, output_tokens=output_tokens,
+            error=f"could not parse model JSON: {exc}",
+        )
+
+    return ReviewBatchResult(
+        batch=batch, by_index=by_index, results=results,
+        input_tokens=input_tokens, output_tokens=output_tokens,
+        error=None,
+    )
+
+
 def run_review_phase(conn, client: OpenAI, limit: int | None, stats: Stats) -> None:
     rows = fetch_pending_ai_tags(conn, limit)
     total = len(rows)
@@ -340,123 +448,109 @@ def run_review_phase(conn, client: OpenAI, limit: int | None, stats: Stats) -> N
         return
     log.info("REVIEW: %d pending AI tag(s) to review (model=%s).", total, REVIEW_MODEL)
 
+    batches = list(chunked(rows, REVIEW_BATCH_SIZE))
+    log.info(
+        "REVIEW: %d batch(es) queued, concurrency=%d (REVIEW_CONCURRENCY).",
+        len(batches), REVIEW_CONCURRENCY,
+    )
+
+    # Workers ONLY do the OpenAI call + JSON parse (no DB access — see
+    # _review_one_batch). We consume completed batches here on the main
+    # thread via as_completed() and do every DB write (the review_status +
+    # review_note UPDATE, commits) single-threaded, so the one psycopg
+    # connection is never shared across threads. The running cost counter
+    # (stats) is likewise only ever mutated here on the main thread.
     done = 0
-    for batch in chunked(rows, REVIEW_BATCH_SIZE):
-        by_index = {i: row for i, row in enumerate(batch)}
-        payload = [
-            {
-                "index": i,
-                "ref": _row_ref_key(row),
-                "verse_text": row["text"],
-                "focus_slug": row["focus_slug"],
-                "emotion": row["emotion"],
-                "tone": row["tone"],
-            }
-            for i, row in by_index.items()
-        ]
-        messages = [
-            {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps({"items": payload}, ensure_ascii=False)},
-        ]
-
-        try:
-            resp = call_with_retries(
-                lambda: client.chat.completions.create(
-                    model=REVIEW_MODEL,
-                    messages=messages,
-                    response_format={"type": "json_object"},
-                    temperature=0,
-                ),
-                what=f"chat.completions.create (review batch of {len(batch)})",
-            )
-        except Exception as exc:  # noqa: BLE001
-            stats.batches_failed += 1
-            log.error(
-                "REVIEW: batch of %d tags failed after retries, skipping "
-                "(rows stay 'pending', will retry on next run): %s",
-                len(batch), exc,
-            )
-            continue
-
-        if getattr(resp, "usage", None):
-            stats.input_tokens += resp.usage.prompt_tokens or 0
-            stats.output_tokens += resp.usage.completion_tokens or 0
-
-        raw_content = resp.choices[0].message.content
-        try:
-            parsed = json.loads(raw_content)
-            results = parsed.get("results", [])
-            if not isinstance(results, list):
-                raise ValueError("'results' is not a list")
-        except Exception as exc:  # noqa: BLE001
-            stats.batches_failed += 1
-            log.error(
-                "REVIEW: could not parse model JSON for batch of %d tags, "
-                "skipping (rows stay 'pending', will retry on next run): %s",
-                len(batch), exc,
-            )
-            continue
-
-        seen_indices: set = set()
-        batch_approved = 0
-        batch_rejected = 0
-        for entry in results:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=REVIEW_CONCURRENCY) as executor:
+        future_to_batch = {
+            executor.submit(_review_one_batch, client, batch): batch for batch in batches
+        }
+        for future in concurrent.futures.as_completed(future_to_batch):
+            batch = future_to_batch[future]
             try:
-                idx = int(entry["index"])
-                approve = bool(entry["approve"])
-                reason = str(entry.get("reason") or "").strip()[:500]
-            except (KeyError, TypeError, ValueError):
-                log.warning("REVIEW: dropping malformed result entry: %r", entry)
-                continue
-            if idx not in by_index:
-                log.warning("REVIEW: model returned unrequested index %r, ignoring.", idx)
-                continue
-            if idx in seen_indices:
-                log.warning("REVIEW: model returned duplicate index %r, ignoring repeat.", idx)
-                continue
-            seen_indices.add(idx)
-
-            row = by_index[idx]
-            if not reason:
-                reason = "(model gave no reason)"
-            try:
-                update_review(conn, row["id"], approve, reason)
-                conn.commit()
-            except Exception as exc:  # noqa: BLE001
-                conn.rollback()
-                stats.rows_failed += 1
+                result = future.result()
+            except Exception as exc:  # noqa: BLE001 - defensive: worker should not raise
+                stats.batches_failed += 1
                 log.error(
-                    "REVIEW: DB update failed for %s (%s), skipping: %s",
-                    _row_ref_key(row), row["focus_slug"], exc,
+                    "REVIEW: worker crashed for batch of %d tags, skipping "
+                    "(rows stay 'pending', will retry on next run): %s",
+                    len(batch), exc,
                 )
                 continue
 
-            stats.tags_considered += 1
-            focus = row["focus_slug"]
-            if approve:
-                stats.tags_approved += 1
-                stats.approved_by_focus[focus] += 1
-                batch_approved += 1
-            else:
-                stats.tags_rejected += 1
-                stats.rejected_by_focus[focus] += 1
-                batch_rejected += 1
+            stats.input_tokens += result.input_tokens
+            stats.output_tokens += result.output_tokens
 
-        missing = set(by_index) - seen_indices
-        if missing:
-            log.warning(
-                "REVIEW: model omitted %d/%d items from this batch's response; "
-                "they stay 'pending' and will be retried on the next run: %s",
-                len(missing), len(batch),
-                sorted(_row_ref_key(by_index[i]) for i in missing),
+            if result.error is not None:
+                stats.batches_failed += 1
+                log.error(
+                    "REVIEW: batch of %d tags failed, skipping "
+                    "(rows stay 'pending', will retry on next run): %s",
+                    len(result.batch), result.error,
+                )
+                continue
+
+            by_index = result.by_index
+            seen_indices: set = set()
+            batch_approved = 0
+            batch_rejected = 0
+            for entry in result.results:
+                try:
+                    idx = int(entry["index"])
+                    approve = bool(entry["approve"])
+                    reason = str(entry.get("reason") or "").strip()[:500]
+                except (KeyError, TypeError, ValueError):
+                    log.warning("REVIEW: dropping malformed result entry: %r", entry)
+                    continue
+                if idx not in by_index:
+                    log.warning("REVIEW: model returned unrequested index %r, ignoring.", idx)
+                    continue
+                if idx in seen_indices:
+                    log.warning("REVIEW: model returned duplicate index %r, ignoring repeat.", idx)
+                    continue
+                seen_indices.add(idx)
+
+                row = by_index[idx]
+                if not reason:
+                    reason = "(model gave no reason)"
+                try:
+                    update_review(conn, row["id"], approve, reason)
+                    conn.commit()
+                except Exception as exc:  # noqa: BLE001
+                    conn.rollback()
+                    stats.rows_failed += 1
+                    log.error(
+                        "REVIEW: DB update failed for %s (%s), skipping: %s",
+                        _row_ref_key(row), row["focus_slug"], exc,
+                    )
+                    continue
+
+                stats.tags_considered += 1
+                focus = row["focus_slug"]
+                if approve:
+                    stats.tags_approved += 1
+                    stats.approved_by_focus[focus] += 1
+                    batch_approved += 1
+                else:
+                    stats.tags_rejected += 1
+                    stats.rejected_by_focus[focus] += 1
+                    batch_rejected += 1
+
+            missing = set(by_index) - seen_indices
+            if missing:
+                log.warning(
+                    "REVIEW: model omitted %d/%d items from this batch's response; "
+                    "they stay 'pending' and will be retried on the next run: %s",
+                    len(missing), len(result.batch),
+                    sorted(_row_ref_key(by_index[i]) for i in missing),
+                )
+
+            done += len(seen_indices)
+            log.info(
+                "reviewed %d/%d tags considered (%d approved, %d rejected this "
+                "batch; running cost ~$%.4f)",
+                done, total, batch_approved, batch_rejected, stats.cost(),
             )
-
-        done += len(seen_indices)
-        log.info(
-            "reviewed %d/%d tags considered (%d approved, %d rejected this "
-            "batch; running cost ~$%.4f)",
-            done, total, batch_approved, batch_rejected, stats.cost(),
-        )
 
 
 # ============================================================================

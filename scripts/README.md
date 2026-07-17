@@ -290,6 +290,16 @@ reject: a mis-served verse is worse than a missing one.
   precision matters more here, since this is the last check before a tag
   reaches a real user. If you change it, update `CHAT_PRICE_PER_1M_TOKENS`
   in `review_tags.py` for an accurate running cost estimate.
+- **`REVIEW_CONCURRENCY`** (optional, default `8`) — like `tag_bible.py`'s
+  `TAG_CONCURRENCY`, the review pass is bottlenecked on the OpenAI API
+  round-trip, not CPU or the DB, so review batches now run concurrently on
+  a `ThreadPoolExecutor` with this many workers. Each worker does only the
+  API call + JSON parse; every DB write (the `review_status`/`review_note`
+  UPDATE) still happens serialized on the main thread over the single
+  shared connection, so this is safe to raise without risking concurrent
+  writes. Lower it if you hit OpenAI rate limits; raise it if your account
+  tier has headroom. At the default of 8 workers, expect roughly an 8x
+  wall-clock speedup over reviewing batches one at a time.
 
 ### Running it
 
@@ -316,6 +326,15 @@ rows are ever selected, so re-running after a crash/Ctrl-C, or after a later
 rows are never re-touched. A batch that errors (API failure, malformed
 JSON) is logged and skipped rather than crashing the run; those rows stay
 `'pending'` and are retried on the next run.
+
+Review batches now run concurrently (`ThreadPoolExecutor`,
+`REVIEW_CONCURRENCY` workers, default 8) since each batch mostly just waits
+on the OpenAI round-trip. Only the OpenAI call + JSON parsing happens on
+worker threads; every `review_status`/`review_note` write happens back on
+the main thread over the single shared `psycopg` connection, one batch's
+results at a time, so concurrency never risks concurrent writes or a torn
+commit. At the default of 8 workers, expect roughly an 8x wall-clock
+speedup over the old one-batch-at-a-time behavior.
 
 The script prints progress and a running `$` cost estimate as it goes, and
 a final summary of approved/rejected counts overall **and per
