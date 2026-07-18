@@ -49,9 +49,20 @@ struct KyraView: View {
     private var header: some View {
         ZStack {
             HStack {
-                Button { dismiss() } label: {
-                    COIcon(.chevronRight, size: 20, color: .coInkSecondary)
-                        .rotationEffect(.degrees(180))
+                Button {
+                    appState.tabBarHidden = false   // belt-and-braces: never strand the user
+                    dismiss()
+                } label: {
+                    HStack(spacing: 4) {
+                        COIcon(.chevronRight, size: 20, color: .coInkSecondary)
+                            .rotationEffect(.degrees(180))
+                        Text("Back")
+                            .font(.coUI(14))
+                            .foregroundColor(.coInkSecondary)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.trailing, 12)
+                    .contentShape(Rectangle())   // whole area tappable, not just the stroke
                 }
                 .buttonStyle(.plain)
                 Spacer()

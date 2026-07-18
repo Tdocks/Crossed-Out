@@ -7,14 +7,19 @@ struct AttendView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showAllServices = false
 
-    /// Unscheduled services ("18m", "45m") derived from the appState feed.
-    private var startingSoonServices: [LiveService] {
-        appState.services.filter { $0.time == nil }
+    /// Currently-live services (from the real feed; the hero + any extras).
+    private var liveServices: [LiveService] {
+        appState.services.filter { $0.isLive }
     }
 
-    /// Time-scheduled services (e.g. "9:00 AM") derived from the appState feed.
+    /// Unscheduled, not-yet-live services ("18m", "45m").
+    private var startingSoonServices: [LiveService] {
+        appState.services.filter { !$0.isLive && $0.time == nil }
+    }
+
+    /// Time-scheduled services (e.g. "9:00 AM").
     private var tomorrowServicesList: [LiveService] {
-        appState.services.filter { $0.time != nil }
+        appState.services.filter { !$0.isLive && $0.time != nil }
     }
 
     var body: some View {
@@ -35,7 +40,9 @@ struct AttendView: View {
                                 message: "Check back Sunday morning — or explore churches near you."
                             )
                         } else {
-                            liveNowSection
+                            if !liveServices.isEmpty {
+                                liveNowSection
+                            }
                             if !startingSoonServices.isEmpty {
                                 startingSoonSection
                             }
@@ -62,13 +69,17 @@ struct AttendView: View {
             COSectionHeader(title: "Live Now", actionTitle: "See all") {
                 showAllServices = true
             }
-            liveHeroCard
+            if let hero = liveServices.first {
+                liveHeroCard(hero)
+            }
+            ForEach(Array(liveServices.dropFirst())) { service in
+                ServiceRow(service: service, rightLabel: "Live")
+            }
         }
     }
 
-    private var liveHeroCard: some View {
-        let service = MockData.liveNow
-        return NavigationLink {
+    private func liveHeroCard(_ service: LiveService) -> some View {
+        NavigationLink {
             ServiceDetailView(service: service)
         } label: {
             COCard(padding: 0) {

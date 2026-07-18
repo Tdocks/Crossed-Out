@@ -183,16 +183,28 @@ struct ChurchDTO: Codable {
     let city: String
     let rating: Double
     let style: String
-    let distanceMiles: Double
+    let distanceMiles: Double?
     let isLive: Bool?
     let viewers: Int?
     let accent: String
+    let platform: String?
+    let youtubeChannelId: String?
+    let hlsUrl: String?
+    let watchUrl: String?
+    let thumbnailUrl: String?
+    let denomination: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, city, rating, style
         case distanceMiles = "distance_miles"
         case isLive = "is_live"
         case viewers, accent
+        case platform
+        case youtubeChannelId = "youtube_channel_id"
+        case hlsUrl = "hls_url"
+        case watchUrl = "watch_url"
+        case thumbnailUrl = "thumbnail_url"
+        case denomination
     }
 
     func toModel() -> Church {
@@ -202,10 +214,16 @@ struct ChurchDTO: Codable {
             city: city,
             rating: rating,
             style: style,
-            distanceMiles: distanceMiles,
+            distanceMiles: distanceMiles ?? 0,
             isLive: isLive ?? false,
             viewers: viewers,
-            accent: accent
+            accent: accent,
+            platform: platform,
+            youtubeChannelId: youtubeChannelId,
+            hlsURL: hlsUrl,
+            watchURL: watchUrl,
+            thumbnailURL: thumbnailUrl,
+            denomination: denomination
         )
     }
 }

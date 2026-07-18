@@ -244,6 +244,14 @@ final class AppState: ObservableObject {
         todayVerseVerse = recommended.verse
     }
 
+    /// Tier 2 (G19 §9): deterministic re-roll of Today's verse. Penalizes +
+    /// clears today's pick server-side, then re-runs the SAME deterministic
+    /// engine — no AI. No-ops silently if the engine isn't available.
+    func rerollTodayVerse() async {
+        await SupabaseService.shared.prepareVerseReroll()
+        await applyRecommendedVerseIfAvailable(mood: checkInMood?.rawValue)
+    }
+
     // MARK: - Check-In
 
     func saveCheckIn(mood: Mood) async {

@@ -11,9 +11,11 @@ struct TodayView: View {
     @State private var showPraySheet = false
     @State private var prayedToday: Bool = UserDefaults.standard.bool(forKey: TodayView.prayedTodayKey)
     @State private var verseFeedbackGiven: String?
+    @State private var rerolling = false
+    @State private var todayDevotional: Devotional?
     @StateObject private var speechController = TodaySpeechController()
 
-    private enum TodayRoute: Hashable { case bible, kyra, settings }
+    private enum TodayRoute: Hashable { case bible, kyra, settings, devotionals }
 
     private static var prayedTodayKey: String {
         "co.prayedToday." + SupabaseService.dayString(Date())
@@ -31,6 +33,7 @@ struct TodayView: View {
                     verseCard
                     focusCard
                     crossOutRow
+                    devotionalCard
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
@@ -46,6 +49,12 @@ struct TodayView: View {
                     contextText: appState.todayEntry.verse.text
                 )
                 case .settings: SettingsView()
+                case .devotionals: DevotionalsHubView()
+                }
+            }
+            .task {
+                if todayDevotional == nil {
+                    todayDevotional = await SupabaseService.shared.fetchTodayDevotional()
                 }
             }
         }
@@ -210,6 +219,25 @@ struct TodayView: View {
                     verseFeedbackButton(title: "This spoke to me", signal: "spoke")
                     verseFeedbackButton(title: "Not for today", signal: "not_today")
                 }
+                Button {
+                    guard !rerolling else { return }
+                    rerolling = true
+                    Task {
+                        await appState.rerollTodayVerse()
+                        withAnimation(.easeOut(duration: 0.2)) { verseFeedbackGiven = nil }
+                        rerolling = false
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        COIcon(.leaf, size: 12, color: .coOlive)
+                        Text(rerolling ? "Finding another…" : "Show me another verse")
+                            .font(.coUI(11, weight: .medium))
+                            .foregroundColor(.coOlive)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(rerolling)
+                .padding(.top, 2)
             }
         }
         .padding(.top, 4)
@@ -360,6 +388,43 @@ struct TodayView: View {
             }
             .padding(.vertical, 4)
             .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Today's Devotional (entry into the Devotionals hub)
+
+    private var devotionalCard: some View {
+        Button { path.append(TodayRoute.devotionals) } label: {
+            COCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        COIcon(.journal, size: 16, color: .coOlive)
+                        Text("TODAY'S DEVOTIONAL")
+                            .font(.coUI(11, weight: .medium)).tracking(1.2)
+                            .foregroundColor(.coInkTertiary)
+                        Spacer()
+                        COIcon(.chevronRight, size: 14, color: .coInkTertiary)
+                    }
+                    if let d = todayDevotional {
+                        Text(d.title)
+                            .font(.coDisplay(18, weight: .semibold))
+                            .foregroundColor(.coInk)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(d.verseRef)
+                            .font(.coUI(12, weight: .medium))
+                            .foregroundColor(.coCrossRed)
+                    } else {
+                        Text("Read today's devotional, log your own study, or ask Kyra for a suggestion.")
+                            .font(.coUI(13))
+                            .foregroundColor(.coInkSecondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .buttonStyle(.plain)
     }

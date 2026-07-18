@@ -10,6 +10,9 @@ struct ServiceDetailView: View {
     @State private var showPlanVisit = false
     @State private var primaryLabel: String = ""
     @State private var isPrimaryBusy = false
+    @State private var showWatch = false
+    @State private var watchSource: WatchSource?
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ZStack {
@@ -35,6 +38,11 @@ struct ServiceDetailView: View {
         .sheet(isPresented: $showPlanVisit) {
             PlanVisitSheet()
         }
+        .fullScreenCover(isPresented: $showWatch) {
+            if let watchSource {
+                WatchView(source: watchSource, churchName: service.church.name)
+            }
+        }
     }
 }
 
@@ -43,13 +51,22 @@ struct ServiceDetailView: View {
 private extension ServiceDetailView {
     var header: some View {
         ZStack(alignment: .topLeading) {
-            Rectangle()
-                .fill(Color(hex: "3B372F"))
-                .frame(maxWidth: .infinity)
-                .frame(height: 200)
-                .overlay(
-                    COIcon(.church, size: 46, color: Color.white.opacity(0.14))
-                )
+            Group {
+                if let t = service.church.thumbnailURL, let u = URL(string: t) {
+                    AsyncImage(url: u) { img in
+                        img.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle().fill(Color(hex: "3B372F"))
+                    }
+                } else {
+                    Rectangle()
+                        .fill(Color(hex: "3B372F"))
+                        .overlay(COIcon(.church, size: 46, color: Color.white.opacity(0.14)))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 200)
+            .clipped()
             if service.isLive {
                 liveBadge
                     .padding(12)
@@ -185,19 +202,33 @@ private extension ServiceDetailView {
 
 private extension ServiceDetailView {
     func handlePrimaryAction() {
-        guard !isPrimaryBusy else { return }
-        isPrimaryBusy = true
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        let restingLabel = service.isLive ? "Watch Live" : "Set a Reminder"
-        let busyLabel = service.isLive ? "Opening stream..." : "Reminder set."
-        withAnimation(.easeOut(duration: 0.2)) {
-            primaryLabel = busyLabel
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            withAnimation(.easeOut(duration: 0.2)) {
-                primaryLabel = restingLabel
+        if service.isLive {
+            startWatching()
+        } else {
+            // Non-live: lightweight reminder confirmation (real APNs scheduling TBD).
+            guard !isPrimaryBusy else { return }
+            isPrimaryBusy = true
+            withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "Reminder set." }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "Set a Reminder" }
+                isPrimaryBusy = false
             }
-            isPrimaryBusy = false
+        }
+    }
+
+    /// In-app player for YouTube (iframe live embed) or direct HLS; otherwise
+    /// link out to the church's watch page (Facebook, or a YouTube /live URL).
+    func startWatching() {
+        let ch = service.church
+        if ch.platform == "youtube", let cid = ch.youtubeChannelId, !cid.isEmpty {
+            watchSource = .youtube(channelId: cid)
+            showWatch = true
+        } else if ch.platform == "hls", let s = ch.hlsURL, let u = URL(string: s) {
+            watchSource = .hls(url: u)
+            showWatch = true
+        } else if let w = ch.watchURL, let u = URL(string: w) {
+            openURL(u)
         }
     }
 

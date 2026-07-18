@@ -192,3 +192,57 @@ _Added Jul 18, 2026 (Tyler). Priority: **P1 differentiator** — reuses the G1 p
 
 ## 8. Backlog / revisit-when-fresh
 - **Bible tag pre-screen hand-review.** The gpt-5.2 review (4,158 approved / 4,105 rejected, 8/8 flip checks passed) plus the `prescreen_approved.py` tightened pass on the high-volume/low-rejection categories (understanding_god, understanding_the_bible, discipline) are trusted and shipped as-is. Tyler spot-read ~25 of the pre-screen flags (all looked correct) rather than the full list. **TODO when fresh:** open `/tmp/co_prescreen_flagged.csv` (regenerate via `.venv/bin/python scripts/prescreen_approved.py`) and hand-review the full flagged set; optionally widen with `--all-low-rejection`. Low urgency — residual errors are loose-but-true tags, not harmful mis-serves; the harm-critical reject side was audited clean.
+
+---
+
+## 9. Design principle — deterministic-first, AI as an opt-in escape hatch (Tyler, Jul 18)
+Applies to devotional + daily-verse selection (and future recommenders).
+
+**Default path = $0, no AI.** Every devotional/verse pick uses the deterministic
+engines (`today_devotional()`, `recommend_today_verse`). Instant, free, offline-safe.
+
+**Tier 2 — cheap re-roll, still $0.** A user-triggered "Not resonating? Show me
+another" control re-rolls *deterministically* first, using signals we already
+collect (`verse_feedback`: `not_today` / `more_like_this` / `less_like_this`).
+Exhaust deterministic candidates before spending a token.
+
+**Tier 3 — AI suggestion, gated.** Only when the user explicitly asks (a distinct
+"Get an AI suggestion" button) or deterministic options run out. Requirements:
+- Runs through an **edge function**, never client-side OpenAI.
+- **Per-user rate-limited / capped** like Kyra (reuse the `kyra_usage` /
+  `increment_kyra_usage` pattern → a `devotional_ai_usage` cap, e.g. a few/day).
+- Prefer **SELECT-and-FRAME from vetted material** (semantic_search over *approved*
+  `verse_tags` + BSB) over free-generation — controls both cost and the AI-content
+  theology risk we already saw in tagging. Free-generating raw devotional prose is a
+  premium/Plus candidate with heavier guardrails.
+- **Persist the result** (as a user-visible suggestion / saved `user_devotional`) so
+  re-viewing it never re-bills.
+
+Rationale: predictable unit economics + reuse of infra we've already built + avoids
+putting unvetted AI spiritual content in front of users by default.
+
+---
+
+## 10. Plan reset — build the tabs out, don't hide them (Tyler, Jul 18)
+Supersedes §9's "feature-flag Community/Attend off for v1" and Fable's P0-4
+"ship 3 tabs." Decision: **Community and Attend stay in v1 and get built out for
+real.** Stop treating placeholder screens as done. Honest current state (measured):
+- **Community** — already backend-wired (Supabase posts/prayers + report/block),
+  ~490 lines, 0 MockData. Closest to done. Needs: EULA acceptance + a
+  report→human-review moderation flow (P0-2). Then it's launch-ready.
+- **Attend** — front-end mock (`MockData.liveNow`). `churches`/`live_services`
+  tables + `fetchLiveServices` exist. Needs: real directory data, service pages,
+  and video playback (YouTubePlayerKit for YouTube, AVPlayer for HLS, link-out for
+  Facebook — see research/church_streaming_plan.md). Biggest lift.
+- **Explore** — mostly placeholder (`MockData.musicForYou`). Needs a content model
+  (videos/music/articles/journeys) + curated feed + filters.
+
+Also shipped this session (UX): fixed the Reflect→Kyra "stuck" bug (the back
+button's tap target was only the icon stroke — now a real "Back" hit area, plus a
+tab-bar safety reset so switching tabs always restores it); swipe-between-tabs;
+a Today's Devotional card on the Today screen; and a persistent floating Kyra
+button on every tab.
+
+**Recommended build order:** (1) finish Community (small, unblocks P0-2, closest
+to done) → (2) Attend (biggest differentiator + research already done) → (3)
+Explore. Each is its own focused build with a current-state read first.

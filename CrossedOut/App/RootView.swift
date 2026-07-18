@@ -51,6 +51,7 @@ struct RootView: View {
 
 struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showKyra = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -76,8 +77,56 @@ struct MainTabView: View {
                         )
                     )
             }
+
+            // Persistent Kyra access — a floating guide button above the tab
+            // bar, available on every tab. Hidden on detail screens.
+            if !appState.tabBarHidden {
+                Button { showKyra = true } label: {
+                    Text("K")
+                        .font(.coScripture(22))
+                        .foregroundColor(.white)
+                        .frame(width: 54, height: 54)
+                        .background(Color.coCrossRed)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 20)
+                .padding(.bottom, 82)
+                .transition(.opacity)
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: appState.tabBarHidden)
+        // Swipe left/right anywhere in the tab content to move between tabs.
+        // Runs alongside scroll views (simultaneousGesture) and only fires on a
+        // decisive, clearly-horizontal swipe, and never while a detail screen has
+        // hidden the tab bar (so it can't fight the edge-swipe-back gesture).
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { value in
+                    guard !appState.tabBarHidden else { return }
+                    let dx = value.translation.width
+                    let dy = value.translation.height
+                    guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                    let tabs = COTab.allCases
+                    guard let i = tabs.firstIndex(of: appState.selectedTab) else { return }
+                    if dx < 0, i < tabs.count - 1 {
+                        withAnimation(.easeInOut(duration: 0.2)) { appState.selectedTab = tabs[i + 1] }
+                    } else if dx > 0, i > 0 {
+                        withAnimation(.easeInOut(duration: 0.2)) { appState.selectedTab = tabs[i - 1] }
+                    }
+                }
+        )
+        // Switching tabs always restores the tab bar — a stranded detail screen
+        // can never leave it hidden once the user changes tabs.
+        .onChange(of: appState.selectedTab) { _, _ in
+            appState.tabBarHidden = false
+        }
+        .fullScreenCover(isPresented: $showKyra) {
+            KyraView().environmentObject(appState)
+        }
     }
 }
 

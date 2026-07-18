@@ -149,6 +149,14 @@ struct Church: Identifiable, Codable, Hashable {
     var isLive: Bool = false
     var viewers: Int?
     let accent: String
+
+    // Streaming (Attend). All optional so existing callers/mock stay valid.
+    var platform: String? = nil          // "youtube" | "hls" | "facebook" | "web"
+    var youtubeChannelId: String? = nil
+    var hlsURL: String? = nil
+    var watchURL: String? = nil
+    var thumbnailURL: String? = nil
+    var denomination: String? = nil
 }
 
 struct LiveService: Identifiable, Codable, Hashable {
@@ -312,4 +320,25 @@ struct UserDevotional: Identifiable, Codable, Hashable {
         case studiedOn = "studied_on"
         case createdAt = "created_at"
     }
+}
+
+/// A gated AI devotional suggestion (Tier 3): a real retrieved verse framed
+/// with a short reflection. Returned by the devotional_suggest edge function.
+struct AiDevotionalSuggestion: Codable, Hashable, Identifiable {
+    var id: String { verseRef }
+    let verseRef: String
+    let book: String?
+    let chapter: Int?
+    let verse: Int?
+    let text: String
+    let title: String
+    let body: String
+    let prompt: String?
+}
+
+/// Outcome of a Tier 3 AI-suggestion request.
+enum DevotionalAIError: Error {
+    case notSignedIn
+    case dailyLimit
+    case failed
 }

@@ -1,13 +1,17 @@
 import SwiftUI
 
-/// Devotionals home: today's built-in devotional, plus the user's own
-/// "independent study" devotionals with a way to add more. Pushed inside an
-/// existing NavigationStack (from More), so it uses NavigationLinks directly.
+/// Devotionals home: today's built-in devotional (with a deterministic
+/// "show me another" re-roll and a gated "ask AI" escape hatch), plus the
+/// user's own "independent study" devotionals. Pushed inside an existing
+/// NavigationStack (from More), so it uses NavigationLinks directly.
 struct DevotionalsHubView: View {
     @State private var today: Devotional?
     @State private var mine: [UserDevotional] = []
+    @State private var seen: [UUID] = []
     @State private var loadingToday = true
+    @State private var rerollingDevo = false
     @State private var showComposer = false
+    @State private var showAi = false
 
     var body: some View {
         ScrollView {
@@ -24,6 +28,11 @@ struct DevotionalsHubView: View {
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showComposer) {
             IndependentStudyComposerView { saved in
+                withAnimation { mine.insert(saved, at: 0) }
+            }
+        }
+        .sheet(isPresented: $showAi) {
+            AiSuggestionSheet { saved in
                 withAnimation { mine.insert(saved, at: 0) }
             }
         }
@@ -50,6 +59,21 @@ struct DevotionalsHubView: View {
                         .foregroundColor(.coInkSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+            if today != nil {
+                HStack(spacing: 18) {
+                    Button { rerollDevotional() } label: {
+                        affordance(.leaf, rerollingDevo ? "Finding…" : "Show me another")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(rerollingDevo)
+                    Button { showAi = true } label: {
+                        affordance(.prayer, "Ask AI for one")
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding(.top, 2)
             }
         }
     }
@@ -80,6 +104,27 @@ struct DevotionalsHubView: View {
                 }
                 .padding(.top, 2)
             }
+        }
+    }
+
+    private func affordance(_ icon: COIconName, _ text: String) -> some View {
+        HStack(spacing: 5) {
+            COIcon(icon, size: 13, color: .coOlive)
+            Text(text)
+                .font(.coUI(12, weight: .medium))
+                .foregroundColor(.coOlive)
+        }
+    }
+
+    private func rerollDevotional() {
+        guard !rerollingDevo else { return }
+        rerollingDevo = true
+        Task {
+            if let next = await SupabaseService.shared.nextDevotional(excluding: seen) {
+                withAnimation { today = next }
+                seen.append(next.id)
+            }
+            rerollingDevo = false
         }
     }
 
@@ -160,6 +205,7 @@ struct DevotionalsHubView: View {
 
     private func loadToday() async {
         today = await SupabaseService.shared.fetchTodayDevotional()
+        if let id = today?.id { seen = [id] }
         loadingToday = false
     }
 
