@@ -14,6 +14,10 @@ struct RootView: View {
                 // a stale/missing session at launch). There is no anonymous
                 // fallback, so this gate is mandatory and non-dismissible.
                 AuthGateView()
+            } else if appState.isPendingVerification {
+                // A church that self-signed-up in the app. No app access until
+                // a system admin verifies the account (migration 0021).
+                PendingVerificationView()
             } else {
                 MainTabView()
             }
@@ -196,7 +200,7 @@ extension View {
 /// screens in this app) disables UIKit's interactive edge-swipe-to-pop
 /// gesture as a side effect. Restoring the gesture's delegate here brings
 /// swipe-back back for every navigation controller in the app.
-extension UINavigationController: UIGestureRecognizerDelegate {
+extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     override open func viewDidLoad() {
         super.viewDidLoad()
         interactivePopGestureRecognizer?.delegate = self

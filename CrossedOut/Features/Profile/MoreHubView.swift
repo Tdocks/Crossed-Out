@@ -10,15 +10,26 @@ struct MoreHubView: View {
         let icon: COIconName
     }
 
-    private let rows: [Row] = [
-        Row(title: "Devotionals", icon: .journal),
-        Row(title: "Explore", icon: .search),
-        Row(title: "Church Finder", icon: .mapPin),
-        Row(title: "Give", icon: .give),
-        Row(title: "Journey", icon: .flame),
-        Row(title: "Kyra", icon: .prayer),
-        Row(title: "Settings", icon: .more)
-    ]
+    /// Rows are role-aware: church admins get a "Manage My Church" entry and
+    /// system admins get an "Admin" entry, both pinned to the top.
+    private var rows: [Row] {
+        var base: [Row] = [
+            Row(title: "Devotionals", icon: .journal),
+            Row(title: "Explore", icon: .search),
+            Row(title: "Church Finder", icon: .mapPin),
+            Row(title: "Give", icon: .give),
+            Row(title: "Journey", icon: .flame),
+            Row(title: "Kyra", icon: .prayer),
+            Row(title: "Settings", icon: .more)
+        ]
+        if appState.isChurchAdmin {
+            base.insert(Row(title: "Manage My Church", icon: .mapPin), at: 0)
+        }
+        if appState.isSystemAdmin {
+            base.insert(Row(title: "Admin", icon: .more), at: 0)
+        }
+        return base
+    }
 
     var body: some View {
         NavigationStack {
@@ -146,15 +157,24 @@ struct MoreHubView: View {
 
     @ViewBuilder
     private func destination(for title: String) -> some View {
-        switch title {
-        case "Devotionals": DevotionalsHubView()
-        case "Explore": ExploreView()
-        case "Church Finder": ChurchFinderView()
-        case "Give": GiveView()
-        case "Journey": JourneyProgressView()
-        case "Kyra": KyraView()
-        case "Settings": SettingsView()
-        default: ExploreView()
+        Group {
+            switch title {
+            case "Admin": AdminHubView()
+            case "Manage My Church": ChurchManageView()
+            case "Devotionals": DevotionalsHubView()
+            case "Explore": ExploreView()
+            case "Church Finder": ChurchFinderView()
+            case "Give": GiveView()
+            case "Journey": JourneyProgressView()
+            case "Kyra": KyraView()
+            case "Settings": SettingsView()
+            default: ExploreView()
+            }
         }
+        // Hide the floating tab bar in these pushed sub-screens. This also makes
+        // `tabBarHidden` true here, which disables the swipe-between-tabs gesture
+        // so an edge back-swipe (More -> Journey) pops normally instead of
+        // jumping to an adjacent tab.
+        .hidesTabBar()
     }
 }

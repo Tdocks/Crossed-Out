@@ -3,7 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject private var appState: AppState
 
-    private enum Step { case welcome, name, focus, need, auth }
+    private enum Step { case welcome, name, focus, need, auth, churchAuth, churchApply }
 
     @State private var step: Step = .welcome
     @State private var firstNameText: String = ""
@@ -21,6 +21,8 @@ struct OnboardingView: View {
             case .focus: focusStep
             case .need: needStep
             case .auth: authStep
+            case .churchAuth: churchAuthStep
+            case .churchApply: churchApplyStep
             }
         }
         .animation(.easeInOut(duration: 0.25), value: step)
@@ -57,6 +59,50 @@ struct OnboardingView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Church signup steps
+
+    /// A church rep creates an account first (so the application has a session
+    /// to attach to), then fills out the church application. The account lands
+    /// in pending_verification until a system admin approves it.
+    private var churchAuthStep: some View {
+        VStack(spacing: 0) {
+            churchBackButton(to: .welcome)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Register your church")
+                    .font(.coDisplay(24, weight: .semibold))
+                    .foregroundColor(.coInk)
+                Text("First, create the account you'll manage your church with.")
+                    .font(.coUI(14))
+                    .foregroundColor(.coInkSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+
+            AuthSheet(mode: .createAccount) { _ in
+                step = .churchApply
+            }
+        }
+    }
+
+    private var churchApplyStep: some View {
+        VStack(spacing: 0) {
+            churchBackButton(to: .churchAuth)
+            ChurchApplicationView()
+        }
+    }
+
+    private func churchBackButton(to destination: Step) -> some View {
+        HStack {
+            Button { step = destination } label: {
+                Text("Back").font(.coUI(14)).foregroundColor(.coInkSecondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
     }
 
     private func resolveFirstName(appleGivenName: String?) -> String {
@@ -108,6 +154,14 @@ struct OnboardingView: View {
                 COSecondaryButton(title: "I already have an account") {
                     authMode = .signIn
                     step = .auth
+                }
+                Button {
+                    step = .churchAuth
+                } label: {
+                    Text("Represent a church? Register here")
+                        .font(.coUI(13))
+                        .foregroundColor(.coInkSecondary)
+                        .padding(.top, 4)
                 }
             }
             .padding(.horizontal, 24)

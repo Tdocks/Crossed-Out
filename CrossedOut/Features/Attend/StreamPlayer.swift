@@ -7,12 +7,12 @@ import WebKit
 /// How a given service is watched in-app. Facebook / unknown platforms are
 /// handled by ServiceDetailView as a link-out (openURL), not here.
 enum WatchSource: Identifiable, Hashable {
-    case youtube(channelId: String)   // official iframe live embed (ToS-compliant)
+    case youtube(videoId: String)     // embed the SPECIFIC live video (reliable)
     case hls(url: URL)                // direct .m3u8 via AVPlayer
 
     var id: String {
         switch self {
-        case .youtube(let c): return "yt:\(c)"
+        case .youtube(let v): return "yt:\(v)"
         case .hls(let u): return "hls:\(u.absoluteString)"
         }
     }
@@ -30,8 +30,8 @@ struct WatchView: View {
             Color.black.ignoresSafeArea()
 
             switch source {
-            case .youtube(let channelId):
-                YouTubeLiveEmbedView(channelId: channelId)
+            case .youtube(let videoId):
+                YouTubeLiveEmbedView(videoId: videoId)
                     .ignoresSafeArea(edges: .horizontal)
             case .hls(let url):
                 HLSPlayerView(url: url)
@@ -61,7 +61,7 @@ struct WatchView: View {
 // MARK: - YouTube live embed (official iframe — never raw HLS extraction)
 
 struct YouTubeLiveEmbedView: UIViewRepresentable {
-    let channelId: String
+    let videoId: String
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -83,7 +83,7 @@ struct YouTubeLiveEmbedView: UIViewRepresentable {
         .wrap{position:relative;width:100%;height:100%;}
         iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;}</style>
         </head><body><div class="wrap">
-        <iframe src="https://www.youtube.com/embed/live_stream?channel=\(channelId)&autoplay=1&playsinline=1&rel=0&modestbranding=1"
+        <iframe src="https://www.youtube.com/embed/\(videoId)?autoplay=1&playsinline=1&rel=0&modestbranding=1"
           allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
         </div></body></html>
         """

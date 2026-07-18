@@ -193,6 +193,11 @@ struct ChurchDTO: Codable {
     let watchUrl: String?
     let thumbnailUrl: String?
     let denomination: String?
+    let liveVideoId: String?
+    let websiteUrl: String?
+    let contactEmail: String?
+    let youtubeHandle: String?
+    let isPublished: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, city, rating, style
@@ -205,6 +210,11 @@ struct ChurchDTO: Codable {
         case watchUrl = "watch_url"
         case thumbnailUrl = "thumbnail_url"
         case denomination
+        case liveVideoId = "live_video_id"
+        case websiteUrl = "website_url"
+        case contactEmail = "contact_email"
+        case youtubeHandle = "youtube_handle"
+        case isPublished = "is_published"
     }
 
     func toModel() -> Church {
@@ -223,7 +233,12 @@ struct ChurchDTO: Codable {
             hlsURL: hlsUrl,
             watchURL: watchUrl,
             thumbnailURL: thumbnailUrl,
-            denomination: denomination
+            denomination: denomination,
+            liveVideoId: liveVideoId,
+            websiteURL: websiteUrl,
+            contactEmail: contactEmail,
+            youtubeHandle: youtubeHandle,
+            isPublished: isPublished ?? true
         )
     }
 }
@@ -284,6 +299,11 @@ struct ProfileDTO: Codable {
     let translation: String?
     let dayNumber: Int?
     let focusAreas: [String]?
+    // Roles & verification (migration 0021). Optional so profiles fetched
+    // before that migration (or partial rows) still decode.
+    let role: String?
+    let accountStatus: String?
+    let churchId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -291,6 +311,9 @@ struct ProfileDTO: Codable {
         case need, translation
         case dayNumber = "day_number"
         case focusAreas = "focus_areas"
+        case role
+        case accountStatus = "account_status"
+        case churchId = "church_id"
     }
 }
 

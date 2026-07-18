@@ -13,6 +13,19 @@ final class AppState: ObservableObject {
     @Published var checkInMood: Mood?
     @Published var tabBarHidden = false
 
+    // MARK: - Role & verification (migration 0021)
+    @Published var role: UserRole = .user
+    @Published var accountStatus: AccountStatus = .active
+    @Published var churchId: UUID?
+
+    /// Tyler / other allow-listed accounts. Can verify churches + mint invites.
+    var isSystemAdmin: Bool { role == .systemAdmin }
+    /// Manages a church (edit its info, interact with community).
+    var isChurchAdmin: Bool { role == .churchAdmin }
+    /// A church that self-signed-up in the app and has no access until a
+    /// system admin verifies it. Gated at RootView.
+    var isPendingVerification: Bool { accountStatus == .pendingVerification }
+
     /// Quiet "why this verse" line from the deterministic personalization
     /// engine (recommend_today_verse RPC). Nil whenever that engine hasn't
     /// produced a result — Today's screen simply omits the reason line then.
@@ -49,6 +62,9 @@ final class AppState: ObservableObject {
         static let lastCheckInDate = "co.lastCheckInDate"
         static let todayMoodPrefix = "co.todayMood."
         static let seededWorkingItems = "co.seededWorkingItems"
+        static let role = "co.role"
+        static let accountStatus = "co.accountStatus"
+        static let churchId = "co.churchId"
     }
 
     // MARK: - Init
@@ -66,6 +82,12 @@ final class AppState: ObservableObject {
            let mood = Mood(rawValue: moodRaw) {
             checkInMood = mood
         }
+        // Restore role/status so the launch-time gate (RootView) is correct
+        // before the network profile fetch lands — avoids briefly showing app
+        // content to a church account that's still pending verification.
+        role = UserRole(rawValue: defaults.string(forKey: DefaultsKey.role) ?? "") ?? .user
+        accountStatus = AccountStatus(rawValue: defaults.string(forKey: DefaultsKey.accountStatus) ?? "") ?? .active
+        if let cid = defaults.string(forKey: DefaultsKey.churchId) { churchId = UUID(uuidString: cid) }
     }
 
     // MARK: - Lifecycle
@@ -180,6 +202,9 @@ final class AppState: ObservableObject {
                     dayNumber: remote.dayNumber ?? computedDayNumber
                 )
                 persistProfile()
+                applyRoleState(role: UserRole(dbValue: remote.role),
+                               status: AccountStatus(dbValue: remote.accountStatus),
+                               churchId: remote.churchId)
             } else if hasOnboarded {
                 await service.upsertProfile(
                     firstName: profile.firstName,
@@ -342,6 +367,18 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Church application
+
+    /// Finalizes an in-app church signup: marks onboarding complete (so the
+    /// user clears the OnboardingView gate) and records the church_admin /
+    /// pending_verification state so RootView shows the pending screen.
+    func completeChurchApplication(churchId: UUID) {
+        hasOnboarded = true
+        persistHasOnboarded()
+        refreshAuthState()
+        applyRoleState(role: .churchAdmin, status: .pendingVerification, churchId: churchId)
+    }
+
     // MARK: - Auth
 
     /// Refreshes `isAuthenticated` from the current Supabase session state.
@@ -366,6 +403,7 @@ final class AppState: ObservableObject {
     /// (RootView) rather than being sent back through onboarding.
     func signOutAndReset() {
         isAuthenticated = false
+        clearRoleState()
         Task {
             await SupabaseService.shared.signOut()
             refreshAuthState()
@@ -415,6 +453,23 @@ final class AppState: ObservableObject {
     private func persistProfile() {
         guard let data = try? JSONEncoder().encode(profile) else { return }
         UserDefaults.standard.set(data, forKey: DefaultsKey.profile)
+    }
+
+    /// Applies + persists role/status/churchId from a remote profile fetch.
+    func applyRoleState(role: UserRole, status: AccountStatus, churchId: UUID?) {
+        self.role = role
+        self.accountStatus = status
+        self.churchId = churchId
+        let defaults = UserDefaults.standard
+        defaults.set(role.rawValue, forKey: DefaultsKey.role)
+        defaults.set(status.rawValue, forKey: DefaultsKey.accountStatus)
+        if let churchId { defaults.set(churchId.uuidString, forKey: DefaultsKey.churchId) }
+        else { defaults.removeObject(forKey: DefaultsKey.churchId) }
+    }
+
+    /// Resets role/status to defaults (used on sign-out).
+    private func clearRoleState() {
+        applyRoleState(role: .user, status: .active, churchId: nil)
     }
 
     private func persistHasOnboarded() {

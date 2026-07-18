@@ -11,6 +11,8 @@ struct ServiceDetailView: View {
     @State private var primaryLabel: String = ""
     @State private var isPrimaryBusy = false
     @State private var watchSource: WatchSource?
+    @State private var showNotLiveAlert = false
+    @State private var notLiveChannelURL: URL?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -28,6 +30,7 @@ struct ServiceDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .hidesTabBar()
         .onAppear {
             if primaryLabel.isEmpty {
                 primaryLabel = service.isLive ? "Watch Live" : "Set a Reminder"
@@ -39,6 +42,14 @@ struct ServiceDetailView: View {
         }
         .fullScreenCover(item: $watchSource) { source in
             WatchView(source: source, churchName: service.church.name)
+        }
+        .alert("Not live right now", isPresented: $showNotLiveAlert) {
+            if let url = notLiveChannelURL {
+                Button("Open on YouTube") { openURL(url) }
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("\(service.church.name) isn't streaming at the moment. Check their YouTube channel for the schedule.")
         }
     }
 }
@@ -218,13 +229,34 @@ private extension ServiceDetailView {
     /// link out to the church's watch page (Facebook, or a YouTube /live URL).
     func startWatching() {
         let ch = service.church
-        if ch.platform == "youtube", let cid = ch.youtubeChannelId, !cid.isEmpty {
-            watchSource = .youtube(channelId: cid)
+        if ch.platform == "youtube" {
+            if ch.isLive, let vid = ch.liveVideoId, !vid.isEmpty {
+                watchSource = .youtube(videoId: vid)     // embed the exact live broadcast
+            } else {
+                // No current live video (refresh pipeline says not live) — don't
+                // show a dead embed; offer the channel's /live page instead.
+                notLiveChannelURL = fallbackURL(for: ch)
+                showNotLiveAlert = true
+            }
         } else if ch.platform == "hls", let s = ch.hlsURL, let u = URL(string: s) {
             watchSource = .hls(url: u)
         } else if let w = ch.watchURL, let u = URL(string: w) {
             openURL(u)
+        } else {
+            // Last resort for a church with no configured stream: search YouTube.
+            let q = ch.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ch.name
+            if let u = URL(string: "https://www.youtube.com/results?search_query=\(q)+live") {
+                openURL(u)
+            }
         }
+    }
+
+    func fallbackURL(for ch: Church) -> URL? {
+        if let cid = ch.youtubeChannelId, !cid.isEmpty {
+            return URL(string: "https://www.youtube.com/channel/\(cid)/live")
+        }
+        if let w = ch.watchURL { return URL(string: w) }
+        return nil
     }
 
     func toggleSaved() {

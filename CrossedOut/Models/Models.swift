@@ -157,6 +157,13 @@ struct Church: Identifiable, Codable, Hashable {
     var watchURL: String? = nil
     var thumbnailURL: String? = nil
     var denomination: String? = nil
+    var liveVideoId: String? = nil
+
+    // Church-profile fields (migration 0021) — editable by a church_admin.
+    var websiteURL: String? = nil
+    var contactEmail: String? = nil
+    var youtubeHandle: String? = nil
+    var isPublished: Bool = true
 }
 
 struct LiveService: Identifiable, Codable, Hashable {
@@ -211,6 +218,27 @@ struct UserProfile: Identifiable, Codable, Hashable {
     var need: String
     var translation: String
     var dayNumber: Int
+}
+
+// MARK: - Roles & Account Status (migration 0021)
+
+/// Account role. Raw values mirror the DB check constraint exactly.
+enum UserRole: String, Codable, Hashable {
+    case user
+    case churchAdmin = "church_admin"
+    case systemAdmin = "system_admin"
+
+    /// Tolerant parse — unknown/missing values fall back to a plain user.
+    init(dbValue: String?) { self = UserRole(rawValue: dbValue ?? "") ?? .user }
+}
+
+/// Account verification/access state. Raw values mirror the DB constraint.
+enum AccountStatus: String, Codable, Hashable {
+    case active
+    case pendingVerification = "pending_verification"
+    case suspended
+
+    init(dbValue: String?) { self = AccountStatus(rawValue: dbValue ?? "") ?? .active }
 }
 
 // MARK: - Focus Area Slug Mapping

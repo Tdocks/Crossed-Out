@@ -47,7 +47,7 @@ extension Font {
         // Playfair Display, which is a *display* face that reads poorly at body
         // sizes (the "hard to read" complaint). Headlines keep Playfair via
         // coDisplay for brand character.
-        let base = Font.system(size: size, design: .serif, weight: .regular)
+        let base = Font.system(size: size, weight: .regular, design: .serif)
             .leading(.loose)
         return italic ? base.italic() : base
     }
