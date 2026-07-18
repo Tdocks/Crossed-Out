@@ -30,8 +30,10 @@
 		82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E416CE180C9BE0CF3CED42AF /* SettingsView.swift */; };
 		83BB1E5EFFEE74E103313217 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68BF5D32AC54F55EEA766FA /* ExploreView.swift */; };
 		8C4860A0B6ADAF1F7BA2D705 /* BibleReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE4842808F2C29861BB2A2A3 /* BibleReaderView.swift */; };
+		96CA599C3851AB298AFD04DB /* AiSuggestionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF14B0B74F84E765D71F119C /* AiSuggestionSheet.swift */; };
 		9912F6A302F8E2637C5311F1 /* ReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */; };
 		9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01608714F91323B05EDC5DFF /* RootView.swift */; };
+		A5E6ADE515DD18B25AF07810 /* StreamPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100027DD7B644073BE579B7 /* StreamPlayer.swift */; };
 		B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */; };
 		BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF74E32355BCCC414036E57 /* AppState.swift */; };
 		C68DBCF8C4D5107C748E51CD /* PlayfairDisplay-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */; };
@@ -72,6 +74,7 @@
 		92844B9A5A8AE42B2D505A3D /* Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
 		9BF74E32355BCCC414036E57 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A1AB53B5882DE7D559C5A1ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B100027DD7B644073BE579B7 /* StreamPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPlayer.swift; sourceTree = "<group>"; };
 		C6045EA44191338D99C53763 /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
 		C75914BB52BE2DE60E5AB396 /* IndependentStudyComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentStudyComposerView.swift; sourceTree = "<group>"; };
 		CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Devotionals.swift"; sourceTree = "<group>"; };
@@ -88,6 +91,7 @@
 		F561C6AE240BA583BB15B21F /* GiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiveView.swift; sourceTree = "<group>"; };
 		F7ADFEC8C7333827E1855842 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		F8418F244D418C4D90CD398C /* JourneyProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyProgressView.swift; sourceTree = "<group>"; };
+		FF14B0B74F84E765D71F119C /* AiSuggestionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiSuggestionSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +152,7 @@
 		406D93C18D49F1E6D7D3D244 /* Devotionals */ = {
 			isa = PBXGroup;
 			children = (
+				FF14B0B74F84E765D71F119C /* AiSuggestionSheet.swift */,
 				2BC850C24445A437BED5E29A /* DevotionalComponents.swift */,
 				05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */,
 				C75914BB52BE2DE60E5AB396 /* IndependentStudyComposerView.swift */,
@@ -259,6 +264,7 @@
 			children = (
 				4D763F517ED1ACDD00971A01 /* AttendView.swift */,
 				301F62AED89C820CD3369957 /* ServiceDetailView.swift */,
+				B100027DD7B644073BE579B7 /* StreamPlayer.swift */,
 			);
 			path = Attend;
 			sourceTree = "<group>";
@@ -404,6 +410,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				96CA599C3851AB298AFD04DB /* AiSuggestionSheet.swift in Sources */,
 				BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */,
 				53CF5D584110140D5EC53180 /* AttendView.swift in Sources */,
 				B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */,
@@ -430,6 +437,7 @@
 				9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */,
 				20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */,
 				82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */,
+				A5E6ADE515DD18B25AF07810 /* StreamPlayer.swift in Sources */,
 				0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */,
 				F82E556AE2C8E6D2E11DD008 /* SupabaseService.swift in Sources */,
 				20D200C1A012404A338C0F35 /* TabBar.swift in Sources */,

@@ -42,11 +42,13 @@ func relativeStyle(for size: CGFloat) -> Font.TextStyle {
 extension Font {
     /// Playfair Display for Scripture and long reading passages.
     static func coScripture(_ size: CGFloat, italic: Bool = false) -> Font {
-        let candidates = italic ? FontCandidates.scriptureItalic : FontCandidates.scripture
-        if let name = resolvedFontName(candidates) {
-            return .custom(name, size: size, relativeTo: relativeStyle(for: size))
-        }
-        let base = Font.system(size: size, design: .serif)
+        // Reading serif for Scripture + long passages. Uses the system serif
+        // (New York) — a text-optimized, highly readable serif — instead of
+        // Playfair Display, which is a *display* face that reads poorly at body
+        // sizes (the "hard to read" complaint). Headlines keep Playfair via
+        // coDisplay for brand character.
+        let base = Font.system(size: size, design: .serif, weight: .regular)
+            .leading(.loose)
         return italic ? base.italic() : base
     }
 

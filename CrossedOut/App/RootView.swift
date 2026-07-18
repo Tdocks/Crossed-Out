@@ -114,7 +114,11 @@ struct MainTabView: View {
                     guard let i = tabs.firstIndex(of: appState.selectedTab) else { return }
                     if dx < 0, i < tabs.count - 1 {
                         withAnimation(.easeInOut(duration: 0.2)) { appState.selectedTab = tabs[i + 1] }
-                    } else if dx > 0, i > 0 {
+                    } else if dx > 0, i > 0, value.startLocation.x > 44 {
+                        // Rightward swipe = previous tab — but NOT from the left
+                        // edge, which belongs to the navigation back-swipe. This
+                        // stops a back gesture inside a pushed screen (e.g.
+                        // More -> Journey) from being hijacked into a tab change.
                         withAnimation(.easeInOut(duration: 0.2)) { appState.selectedTab = tabs[i - 1] }
                     }
                 }

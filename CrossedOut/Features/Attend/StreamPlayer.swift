@@ -6,9 +6,16 @@ import WebKit
 
 /// How a given service is watched in-app. Facebook / unknown platforms are
 /// handled by ServiceDetailView as a link-out (openURL), not here.
-enum WatchSource: Hashable {
+enum WatchSource: Identifiable, Hashable {
     case youtube(channelId: String)   // official iframe live embed (ToS-compliant)
     case hls(url: URL)                // direct .m3u8 via AVPlayer
+
+    var id: String {
+        switch self {
+        case .youtube(let c): return "yt:\(c)"
+        case .hls(let u): return "hls:\(u.absoluteString)"
+        }
+    }
 }
 
 // MARK: - Full-screen watch view

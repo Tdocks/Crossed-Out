@@ -10,7 +10,6 @@ struct ServiceDetailView: View {
     @State private var showPlanVisit = false
     @State private var primaryLabel: String = ""
     @State private var isPrimaryBusy = false
-    @State private var showWatch = false
     @State private var watchSource: WatchSource?
     @Environment(\.openURL) private var openURL
 
@@ -38,10 +37,8 @@ struct ServiceDetailView: View {
         .sheet(isPresented: $showPlanVisit) {
             PlanVisitSheet()
         }
-        .fullScreenCover(isPresented: $showWatch) {
-            if let watchSource {
-                WatchView(source: watchSource, churchName: service.church.name)
-            }
+        .fullScreenCover(item: $watchSource) { source in
+            WatchView(source: source, churchName: service.church.name)
         }
     }
 }
@@ -223,10 +220,8 @@ private extension ServiceDetailView {
         let ch = service.church
         if ch.platform == "youtube", let cid = ch.youtubeChannelId, !cid.isEmpty {
             watchSource = .youtube(channelId: cid)
-            showWatch = true
         } else if ch.platform == "hls", let s = ch.hlsURL, let u = URL(string: s) {
             watchSource = .hls(url: u)
-            showWatch = true
         } else if let w = ch.watchURL, let u = URL(string: w) {
             openURL(u)
         }
