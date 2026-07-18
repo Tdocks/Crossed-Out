@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		03AE791CE55ED801D34B1004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1AB53B5882DE7D559C5A1ED /* Assets.xcassets */; };
+		0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */; };
 		1429F8BC18D96F26E8EBED59 /* CrossedOutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8817ED9B69880386FF44CCF4 /* CrossedOutApp.swift */; };
 		181037C41BB02857ECE062B5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583F1B69EE280361D4A18B79 /* Components.swift */; };
 		1E843D70D7E9F8C56B6A55EF /* Inter-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 314A2153E9CC5E81022CB9EF /* Inter-Italic.ttf */; };
@@ -16,6 +17,7 @@
 		29C3C08C042DBD4D2AFC7567 /* JourneyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8418F244D418C4D90CD398C /* JourneyProgressView.swift */; };
 		3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB434650612A2DEA8A15E75 /* EmptyState.swift */; };
 		3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */; };
+		45EBCA48F29A7A768D454731 /* DevotionalsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */; };
 		53CF5D584110140D5EC53180 /* AttendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D763F517ED1ACDD00971A01 /* AttendView.swift */; };
 		5C1B817C91057A4B7D0FBB38 /* KyraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7895D987D6316A315E2BE5C0 /* KyraView.swift */; };
 		5D7136122054C197E5474FD5 /* MoreHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F5E91BE154B378075E6F78E /* MoreHubView.swift */; };
@@ -34,8 +36,10 @@
 		BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF74E32355BCCC414036E57 /* AppState.swift */; };
 		C68DBCF8C4D5107C748E51CD /* PlayfairDisplay-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */; };
 		C7ACBE3733A8F4465DCE840B /* BridgeShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244B30446FDFB2BFF005543F /* BridgeShareView.swift */; };
+		CA787DAE444557D02495D3A4 /* DevotionalComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BC850C24445A437BED5E29A /* DevotionalComponents.swift */; };
 		CBD03BCDB0D18AE6FC69F7E2 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88745AB55D413F7CE574533E /* Typography.swift */; };
 		CC42DA3C8631D5E30F8D0875 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6045EA44191338D99C53763 /* MockData.swift */; };
+		D3729771AE7A43E29FA6FE5D /* IndependentStudyComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75914BB52BE2DE60E5AB396 /* IndependentStudyComposerView.swift */; };
 		D7AE2345B38CF7BAC7199185 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C2068096DEA50273F324B8 /* OnboardingView.swift */; };
 		D8F02082223345F0AFFDCE06 /* GiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F561C6AE240BA583BB15B21F /* GiveView.swift */; };
 		F82E556AE2C8E6D2E11DD008 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7ADFEC8C7333827E1855842 /* SupabaseService.swift */; };
@@ -45,10 +49,12 @@
 
 /* Begin PBXFileReference section */
 		01608714F91323B05EDC5DFF /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevotionalsHubView.swift; sourceTree = "<group>"; };
 		0A9844F06CCD645DD9C91A8D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		0D4A83A506B6EF6EB332363A /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
 		19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CrossedOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		244B30446FDFB2BFF005543F /* BridgeShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeShareView.swift; sourceTree = "<group>"; };
+		2BC850C24445A437BED5E29A /* DevotionalComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevotionalComponents.swift; sourceTree = "<group>"; };
 		301F62AED89C820CD3369957 /* ServiceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceDetailView.swift; sourceTree = "<group>"; };
 		314A2153E9CC5E81022CB9EF /* Inter-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Italic.ttf"; sourceTree = "<group>"; };
 		3CFA439125C7FB6B3DC9361B /* TabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBar.swift; sourceTree = "<group>"; };
@@ -67,6 +73,8 @@
 		9BF74E32355BCCC414036E57 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A1AB53B5882DE7D559C5A1ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C6045EA44191338D99C53763 /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
+		C75914BB52BE2DE60E5AB396 /* IndependentStudyComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentStudyComposerView.swift; sourceTree = "<group>"; };
+		CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Devotionals.swift"; sourceTree = "<group>"; };
 		CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchFinderView.swift; sourceTree = "<group>"; };
 		D4C2068096DEA50273F324B8 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D722B64EEA03E7C1D5D3586D /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -135,6 +143,16 @@
 				F8418F244D418C4D90CD398C /* JourneyProgressView.swift */,
 			);
 			path = Progress;
+			sourceTree = "<group>";
+		};
+		406D93C18D49F1E6D7D3D244 /* Devotionals */ = {
+			isa = PBXGroup;
+			children = (
+				2BC850C24445A437BED5E29A /* DevotionalComponents.swift */,
+				05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */,
+				C75914BB52BE2DE60E5AB396 /* IndependentStudyComposerView.swift */,
+			);
+			path = Devotionals;
 			sourceTree = "<group>";
 		};
 		46B62C6A6D91EDC1DFADC2EE /* Bridge */ = {
@@ -220,6 +238,7 @@
 				C6045EA44191338D99C53763 /* MockData.swift */,
 				E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */,
 				F7ADFEC8C7333827E1855842 /* SupabaseService.swift */,
+				CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -260,6 +279,7 @@
 				46B62C6A6D91EDC1DFADC2EE /* Bridge */,
 				CCF60E65CC5FB162B065713D /* Churches */,
 				997EEC33C3166F32B2D0A1F8 /* Community */,
+				406D93C18D49F1E6D7D3D244 /* Devotionals */,
 				F1C71CDD98A67E0F207D77A1 /* Explore */,
 				E5B10C1B6A043E5930894A6A /* Give */,
 				056E5C95E0F65DC938084FC1 /* Kyra */,
@@ -393,10 +413,13 @@
 				67FD6C93898D75B938F6D671 /* CommunityView.swift in Sources */,
 				181037C41BB02857ECE062B5 /* Components.swift in Sources */,
 				1429F8BC18D96F26E8EBED59 /* CrossedOutApp.swift in Sources */,
+				CA787DAE444557D02495D3A4 /* DevotionalComponents.swift in Sources */,
+				45EBCA48F29A7A768D454731 /* DevotionalsHubView.swift in Sources */,
 				3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */,
 				83BB1E5EFFEE74E103313217 /* ExploreView.swift in Sources */,
 				D8F02082223345F0AFFDCE06 /* GiveView.swift in Sources */,
 				5FDFABA1360DCE82F2A126E8 /* Icons.swift in Sources */,
+				D3729771AE7A43E29FA6FE5D /* IndependentStudyComposerView.swift in Sources */,
 				29C3C08C042DBD4D2AFC7567 /* JourneyProgressView.swift in Sources */,
 				5C1B817C91057A4B7D0FBB38 /* KyraView.swift in Sources */,
 				CC42DA3C8631D5E30F8D0875 /* MockData.swift in Sources */,
@@ -407,6 +430,7 @@
 				9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */,
 				20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */,
 				82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */,
+				0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */,
 				F82E556AE2C8E6D2E11DD008 /* SupabaseService.swift in Sources */,
 				20D200C1A012404A338C0F35 /* TabBar.swift in Sources */,
 				609D7C80470BE9C788E18390 /* Theme.swift in Sources */,

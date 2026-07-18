@@ -157,3 +157,38 @@ Tiers: **P0** = launch-credibility/trust blocker; **P1** = differentiator, near-
 6. **Kyra guardrails:** confirm retrieval-grounded, non-roleplay, stated-stance as hard requirements.
 
 _Companion docs: NEXT_PHASES.md (Phase 1 runbook), research/ (ElevenLabs audio, church streaming). Full research: app_audit, competitors_bible, competitors_prayer_ai, differentiation_blindspots (delivered in chat)._
+
+---
+
+## 7. Feature request — Devotional system + preference feedback loop (G19)
+_Added Jul 18, 2026 (Tyler). Priority: **P1 differentiator** — reuses the G1 personalization engine, so relatively cheap to build._
+
+**Intent.** Turn devotionals into a personalized, two-way surface: polish the built-in daily devotional, let users log their own *"independent study"* devotionals (Bible verse + notes), capture a *"did you find this helpful?"* signal on **both** the built-in and the independent versions, and **store** those signals to drive personalized suggestions — learning which devotional styles/topics a user enjoys and steering future content toward (or away from) them.
+
+**What already exists (polish, don't rebuild).**
+- Built-in devotional: `TodayView` "Cross off today's devotional" → `daily_completions(kind='devotional')`; "Reflect" journal action → `recordCompletion(kind:'reflection')` + `user_notes(note text)`; progress in `JourneyProgressView` (migration `0005`).
+- G1 personalization: `focus_areas`, `moods`, `verse_tags`, `recommend_today_verse` RPC, `verse_feedback` — the exact feedback→scoring machinery this feature should plug into (don't invent a parallel one).
+
+**To build.**
+1. **Polish the built-in daily devotional** — give it real structure (title, verse, reflection body/prompt, `style` + `focus_slug` tags), not just a cross-off toggle. Needs a `devotionals` content table + a style taxonomy.
+2. **Independent-study entry** — user logs their own devotional: pick/enter a Bible verse (reuse the existing verse picker + keyword/semantic search), free-text notes/takeaways, optional title + date. New `user_devotionals` table.
+3. **"Did you find this helpful?" on BOTH** built-in and independent (thumbs, or 1–5, plus optional reason chips like "loved the tone" / "too long"). New `devotional_feedback` table.
+4. **Preference loop** — aggregate feedback into per-user style/topic affinities and feed them into a `recommend_devotional` path (mirroring `recommend_today_verse`): liked styles surface more, disliked less. Reuse the impression/day-stability + freshness pattern from `verse_impressions`.
+
+**Data-model sketch (new migration).**
+- `devotionals` — id, title, book/chapter/verse, body, `style` (slug), `focus_slug`, tags, published_at. (Built-in catalog.)
+- `user_devotionals` — id, user_id, title, book/chapter/verse, notes, created_at. RLS: own rows only.
+- `devotional_feedback` — id, user_id, `source` ('builtin' | 'independent'), devotional_id?, user_devotional_id?, `helpful` (bool) or `rating` (1–5), reason_chips[], created_at. RLS: own rows only.
+- Per-user affinities derived from `devotional_feedback` (computed on read, or a small `user_devotional_prefs` rollup) → per style/focus weight.
+
+**Open decisions (for Tyler).**
+- Feedback granularity: simple thumbs (recommended to start) vs. 1–5 vs. tag chips.
+- Who authors the built-in catalog + style taxonomy: hand-curated vs. AI-assisted (same pipeline pattern as the verse tags).
+- Suggestion surface: a "Because you found ___ helpful" row on Today/Explore.
+
+**Roadmap slot:** P1, near-launch fast-follow after G1 lands. Reuses G1 infra (tags, feedback, recommend RPC), so the marginal cost is the new tables + a devotional recommender + the two UI surfaces (built-in polish, independent-study composer).
+
+---
+
+## 8. Backlog / revisit-when-fresh
+- **Bible tag pre-screen hand-review.** The gpt-5.2 review (4,158 approved / 4,105 rejected, 8/8 flip checks passed) plus the `prescreen_approved.py` tightened pass on the high-volume/low-rejection categories (understanding_god, understanding_the_bible, discipline) are trusted and shipped as-is. Tyler spot-read ~25 of the pre-screen flags (all looked correct) rather than the full list. **TODO when fresh:** open `/tmp/co_prescreen_flagged.csv` (regenerate via `.venv/bin/python scripts/prescreen_approved.py`) and hand-review the full flagged set; optionally widen with `--all-low-rejection`. Low urgency — residual errors are loose-but-true tags, not harmful mis-serves; the harm-critical reject side was audited clean.

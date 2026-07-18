@@ -11,6 +11,7 @@ struct MoreHubView: View {
     }
 
     private let rows: [Row] = [
+        Row(title: "Devotionals", icon: .journal),
         Row(title: "Explore", icon: .search),
         Row(title: "Church Finder", icon: .mapPin),
         Row(title: "Give", icon: .give),
@@ -146,6 +147,7 @@ struct MoreHubView: View {
     @ViewBuilder
     private func destination(for title: String) -> some View {
         switch title {
+        case "Devotionals": DevotionalsHubView()
         case "Explore": ExploreView()
         case "Church Finder": ChurchFinderView()
         case "Give": GiveView()

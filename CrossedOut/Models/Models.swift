@@ -258,3 +258,58 @@ enum FocusAreaSlugMap {
         slugToName[slug] ?? slug.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
+
+// MARK: - Devotionals (G19)
+
+/// Which surface a piece of devotional feedback belongs to.
+enum DevotionalSource: String, Codable, Hashable {
+    case builtin
+    case independent
+}
+
+/// A built-in, app-authored devotional (public catalog). Decoded directly
+/// from the `devotionals` table / `today_devotional()` RPC (snake_case).
+struct Devotional: Identifiable, Codable, Hashable {
+    let id: UUID
+    let title: String
+    let verseRef: String
+    let book: String?
+    let chapter: Int?
+    let verse: Int?
+    let verseEnd: Int?
+    let body: String
+    let prompt: String?
+    let style: String
+    let focusSlug: String?
+    let tags: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, book, chapter, verse, body, prompt, style, tags
+        case verseRef = "verse_ref"
+        case verseEnd = "verse_end"
+        case focusSlug = "focus_slug"
+    }
+}
+
+/// A user's own "independent study" devotional (verse + their notes).
+/// Decoded from the `user_devotionals` table (snake_case).
+struct UserDevotional: Identifiable, Codable, Hashable {
+    let id: UUID
+    let title: String?
+    let verseRef: String
+    let book: String?
+    let chapter: Int?
+    let verse: Int?
+    let verseEnd: Int?
+    let notes: String
+    let studiedOn: String
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, book, chapter, verse, notes
+        case verseRef = "verse_ref"
+        case verseEnd = "verse_end"
+        case studiedOn = "studied_on"
+        case createdAt = "created_at"
+    }
+}
