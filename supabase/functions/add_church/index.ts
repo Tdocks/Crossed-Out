@@ -35,9 +35,15 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// Returns { kind: "id", value } or { kind: "handle", value } from any accepted input form.
-function parseInput(raw: string): { kind: "id" | "handle"; value: string } | null {
+// Returns a channel id / handle / video reference from any accepted input form:
+// @handle, bare handle, channel URL, UC… id, OR a video/watch/live/shorts/
+// youtu.be/embed link (resolved to its channel).
+function parseInput(raw: string): { kind: "id" | "handle" | "video"; value: string } | null {
   const input = raw.trim();
+  // Video-style links first — a watch/live/shorts/embed/youtu.be URL carries an
+  // 11-char video id, which we resolve to its owning channel below.
+  const videoMatch = input.match(/(?:[?&]v=|youtu\.be\/|\/live\/|\/shorts\/|\/embed\/)([A-Za-z0-9_-]{11})/);
+  if (videoMatch) return { kind: "video", value: videoMatch[1] };
   const idMatch = input.match(/(UC[A-Za-z0-9_-]{22})/);
   if (idMatch) return { kind: "id", value: idMatch[1] };
   const urlHandle = input.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i);
@@ -47,9 +53,24 @@ function parseInput(raw: string): { kind: "id" | "handle"; value: string } | nul
   return null;
 }
 
-async function resolveChannel(ref: { kind: "id" | "handle"; value: string }): Promise<
+async function resolveChannel(ref: { kind: "id" | "handle" | "video"; value: string }): Promise<
   { channelId: string; title: string; thumbnail: string | null; handle: string | null } | null
 > {
+  // A video reference: look up the video to find its channel id, then fall
+  // through to the normal channel resolution by id.
+  if (ref.kind === "video") {
+    const vurl = new URL("https://www.googleapis.com/youtube/v3/videos");
+    vurl.searchParams.set("part", "snippet");
+    vurl.searchParams.set("id", ref.value);
+    vurl.searchParams.set("key", YOUTUBE_API_KEY);
+    const vres = await fetch(vurl);
+    if (!vres.ok) throw new Error(`videos.list failed ${vres.status}: ${await vres.text()}`);
+    const vdata = await vres.json();
+    const channelId = vdata.items?.[0]?.snippet?.channelId;
+    if (!channelId) return null;
+    ref = { kind: "id", value: channelId };
+  }
+
   const url = new URL("https://www.googleapis.com/youtube/v3/channels");
   url.searchParams.set("part", "snippet");
   if (ref.kind === "id") url.searchParams.set("id", ref.value);
