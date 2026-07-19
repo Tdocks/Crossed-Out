@@ -200,6 +200,12 @@ struct ChurchDTO: Codable {
     let contactEmail: String?
     let youtubeHandle: String?
     let isPublished: Bool?
+    let address: String?
+    let serviceTimes: String?
+    let parkingInfo: String?
+    let kidsInfo: String?
+    let accessibilityInfo: String?
+    let newcomerInfo: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, city, rating, style
@@ -217,6 +223,12 @@ struct ChurchDTO: Codable {
         case contactEmail = "contact_email"
         case youtubeHandle = "youtube_handle"
         case isPublished = "is_published"
+        case address
+        case serviceTimes = "service_times"
+        case parkingInfo = "parking_info"
+        case kidsInfo = "kids_info"
+        case accessibilityInfo = "accessibility_info"
+        case newcomerInfo = "newcomer_info"
     }
 
     func toModel() -> Church {
@@ -240,7 +252,13 @@ struct ChurchDTO: Codable {
             websiteURL: websiteUrl,
             contactEmail: contactEmail,
             youtubeHandle: youtubeHandle,
-            isPublished: isPublished ?? true
+            isPublished: isPublished ?? true,
+            address: address,
+            serviceTimes: serviceTimes,
+            parkingInfo: parkingInfo,
+            kidsInfo: kidsInfo,
+            accessibilityInfo: accessibilityInfo,
+            newcomerInfo: newcomerInfo
         )
     }
 }

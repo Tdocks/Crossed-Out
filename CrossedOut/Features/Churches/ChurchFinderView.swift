@@ -28,7 +28,17 @@ struct ChurchFinderView: View {
 
                     locationRow
 
-                    if appState.churches.isEmpty {
+                    if appState.attendLoading {
+                        loadingState
+                    } else if appState.attendLoadFailed {
+                        COEmptyState(
+                            icon: .church,
+                            title: "Couldn't load churches",
+                            message: "Check your connection and try again.",
+                            actionTitle: "Try Again",
+                            action: { Task { await appState.retryAttend() } }
+                        )
+                    } else if appState.churches.isEmpty {
                         COEmptyState(
                             icon: .church,
                             title: "No churches found",
@@ -78,6 +88,20 @@ struct ChurchFinderView: View {
         Task {
             await SupabaseService.shared.setChurchSaved(churchID: churchID, saved: newValue)
         }
+    }
+
+    // MARK: Loading
+
+    private var loadingState: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .tint(.coCrossRed)
+            Text("Loading churches…")
+                .font(.coUI(13))
+                .foregroundColor(.coInkSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
 
     // MARK: Location Row

@@ -33,10 +33,14 @@ struct AttendView: View {
                             .foregroundColor(.coInk)
                             .padding(.top, 8)
 
-                        if appState.services.isEmpty {
+                        if appState.attendLoading {
+                            loadingState
+                        } else if appState.attendLoadFailed {
+                            errorState
+                        } else if appState.services.isEmpty {
                             COEmptyState(
                                 icon: .attend,
-                                title: "No services right now",
+                                title: "No services scheduled right now",
                                 message: "Check back Sunday morning — or explore churches near you."
                             )
                         } else {
@@ -60,6 +64,30 @@ struct AttendView: View {
                 AllServicesSheet(services: appState.services)
             }
         }
+    }
+
+    // MARK: Loading / Error
+
+    private var loadingState: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .tint(.coCrossRed)
+            Text("Loading services…")
+                .font(.coUI(13))
+                .foregroundColor(.coInkSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+
+    private var errorState: some View {
+        COEmptyState(
+            icon: .attend,
+            title: "Couldn't load services",
+            message: "Check your connection and try again.",
+            actionTitle: "Try Again",
+            action: { Task { await appState.retryAttend() } }
+        )
     }
 
     // MARK: Live Now

@@ -17,6 +17,7 @@ struct MoreHubView: View {
             Row(title: "Devotionals", icon: .journal),
             Row(title: "Explore", icon: .search),
             Row(title: "Church Finder", icon: .mapPin),
+            Row(title: "Cross the Bridge", icon: .bridge),
             Row(title: "Give", icon: .give),
             Row(title: "Journey", icon: .flame),
             Row(title: "Kyra", icon: .prayer),
@@ -164,6 +165,7 @@ struct MoreHubView: View {
             case "Devotionals": DevotionalsHubView()
             case "Explore": ExploreView()
             case "Church Finder": ChurchFinderView()
+            case "Cross the Bridge": BridgeShareView()
             case "Give": GiveView()
             case "Journey": JourneyProgressView()
             case "Kyra": KyraView()

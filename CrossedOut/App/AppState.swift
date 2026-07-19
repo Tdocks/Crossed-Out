@@ -66,6 +66,12 @@ final class AppState: ObservableObject {
     @Published var communityLoadFailed = false
     @Published var churches: [Church] = []
     @Published var services: [LiveService] = []
+    /// Attend directory load state (churches + live services). The feed
+    /// NEVER shows mock churches as if they were real — an honest
+    /// loading/empty/error state beats fake livestreams (see AttendView /
+    /// ChurchFinderView's states).
+    @Published var attendLoading = true
+    @Published var attendLoadFailed = false
     @Published var projects: [GiveProject] = []
     @Published var isSupabaseLive = false
     @Published var isOffline = false
@@ -127,8 +133,8 @@ final class AppState: ObservableObject {
         passages = [MockData.proverbs3BSB, MockData.psalm23, MockData.philippians4]
         // Community intentionally NOT mock-seeded: an empty or honest error
         // state beats fake user content (see CommunityView's states).
-        churches = MockData.churches
-        services = MockData.startingSoon + MockData.tomorrowServices
+        // Attend (churches/services) is likewise NOT mock-seeded — see
+        // attendLoading/attendLoadFailed and AttendView/ChurchFinderView.
         projects = MockData.giveProjects
 
         Task {
@@ -152,15 +158,18 @@ final class AppState: ObservableObject {
             communityLoading = false
             communityLoadFailed = prayersResult == nil && postsResult == nil
             let churchesResult = try? await service.fetchChurches()
-            if let fetched = churchesResult, !fetched.isEmpty {
+            if let fetched = churchesResult {
                 churches = fetched
                 isSupabaseLive = true
             }
             let servicesResult = try? await service.fetchLiveServices()
-            if let fetched = servicesResult, !fetched.isEmpty {
+            if let fetched = servicesResult {
                 services = fetched
                 isSupabaseLive = true
             }
+            attendLoading = false
+            attendLoadFailed = (churchesResult == nil && servicesResult == nil)
+
             let projectsResult = try? await service.fetchGiveProjects()
             if let fetched = projectsResult, !fetched.isEmpty {
                 projects = fetched
@@ -318,6 +327,27 @@ final class AppState: ObservableObject {
         if let fetched = postsResult { posts = fetched }
         communityLoadFailed = prayersResult == nil && postsResult == nil
         communityLoading = false
+    }
+
+    /// Re-attempts loading the Attend directory (churches + live services)
+    /// after a failed fetch. Used by the "Try Again" retry action in
+    /// AttendView's and ChurchFinderView's error states.
+    func retryAttend() async {
+        attendLoading = true
+        attendLoadFailed = false
+        let service = SupabaseService.shared
+        let churchesResult = try? await service.fetchChurches()
+        if let fetched = churchesResult {
+            churches = fetched
+            isSupabaseLive = true
+        }
+        let servicesResult = try? await service.fetchLiveServices()
+        if let fetched = servicesResult {
+            services = fetched
+            isSupabaseLive = true
+        }
+        attendLoading = false
+        attendLoadFailed = (churchesResult == nil && servicesResult == nil)
     }
 
     // MARK: - Legal acceptance (migration 0023)

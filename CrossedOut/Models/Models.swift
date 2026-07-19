@@ -225,6 +225,15 @@ struct Church: Identifiable, Codable, Hashable {
     var contactEmail: String? = nil
     var youtubeHandle: String? = nil
     var isPublished: Bool = true
+
+    // Visit-planning fields (migration 0032) — practical, in-person info
+    // for the Plan-a-Visit screen. All optional; only shown when present.
+    var address: String? = nil
+    var serviceTimes: String? = nil
+    var parkingInfo: String? = nil
+    var kidsInfo: String? = nil
+    var accessibilityInfo: String? = nil
+    var newcomerInfo: String? = nil
 }
 
 struct LiveService: Identifiable, Codable, Hashable {

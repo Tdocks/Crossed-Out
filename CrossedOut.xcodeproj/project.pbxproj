@@ -24,6 +24,7 @@
 		459AF94C948FC8FD56AC98C4 /* SupabaseService+Legal.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBB59E6DC0DF1358CBE1579 /* SupabaseService+Legal.swift */; };
 		45EBCA48F29A7A768D454731 /* DevotionalsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */; };
 		4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */; };
+		528FE0E6CA580B78E511B808 /* SupabaseService+Attend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */; };
 		53CF5D584110140D5EC53180 /* AttendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D763F517ED1ACDD00971A01 /* AttendView.swift */; };
 		5C1B817C91057A4B7D0FBB38 /* KyraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7895D987D6316A315E2BE5C0 /* KyraView.swift */; };
 		5D4532595F7C3D9FDD2AD581 /* ChurchApplicationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83FEA23A803D82902A1792A /* ChurchApplicationView.swift */; };
@@ -48,6 +49,7 @@
 		9912F6A302F8E2637C5311F1 /* ReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */; };
 		9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01608714F91323B05EDC5DFF /* RootView.swift */; };
 		A5E6ADE515DD18B25AF07810 /* StreamPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100027DD7B644073BE579B7 /* StreamPlayer.swift */; };
+		AB542AEE8EB075F15D38920C /* AddToCalendarSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD4C9FC4313ABC3760FEC3F /* AddToCalendarSheet.swift */; };
 		B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */; };
 		B8E303DD8B56441988EA9AD2 /* ChurchFormComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B277E2A63E6A9BDEB6BE02BE /* ChurchFormComponents.swift */; };
 		BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF74E32355BCCC414036E57 /* AppState.swift */; };
@@ -99,12 +101,14 @@
 		92844B9A5A8AE42B2D505A3D /* Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
 		9A1857AC2A298FD8CD86D89D /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
 		9BF74E32355BCCC414036E57 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		9CD4C9FC4313ABC3760FEC3F /* AddToCalendarSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCalendarSheet.swift; sourceTree = "<group>"; };
 		9EFCEA8061198AC0C8C2E922 /* AddChurchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddChurchView.swift; sourceTree = "<group>"; };
 		A11868B00CFF60846A3EAC21 /* ModerationQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationQueueView.swift; sourceTree = "<group>"; };
 		A1AB53B5882DE7D559C5A1ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Bridge.swift"; sourceTree = "<group>"; };
 		AA313CE758BF252E8A734716 /* CrisisSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrisisSupportView.swift; sourceTree = "<group>"; };
 		B100027DD7B644073BE579B7 /* StreamPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPlayer.swift; sourceTree = "<group>"; };
+		B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Attend.swift"; sourceTree = "<group>"; };
 		B277E2A63E6A9BDEB6BE02BE /* ChurchFormComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchFormComponents.swift; sourceTree = "<group>"; };
 		B63C5E6B6D46127C9D25F076 /* PendingVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingVerificationView.swift; sourceTree = "<group>"; };
 		B83FEA23A803D82902A1792A /* ChurchApplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchApplicationView.swift; sourceTree = "<group>"; };
@@ -299,6 +303,7 @@
 				E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */,
 				F7ADFEC8C7333827E1855842 /* SupabaseService.swift */,
 				72B86CF24DDF450708EDC414 /* SupabaseService+Admin.swift */,
+				B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */,
 				A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */,
 				CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */,
 				898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */,
@@ -322,6 +327,7 @@
 		CB9D37F6438A2B2B6F8C0340 /* Attend */ = {
 			isa = PBXGroup;
 			children = (
+				9CD4C9FC4313ABC3760FEC3F /* AddToCalendarSheet.swift */,
 				4D763F517ED1ACDD00971A01 /* AttendView.swift */,
 				301F62AED89C820CD3369957 /* ServiceDetailView.swift */,
 				B100027DD7B644073BE579B7 /* StreamPlayer.swift */,
@@ -484,6 +490,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				932BBA1D8D7CD9733FBA1B3F /* AddChurchView.swift in Sources */,
+				AB542AEE8EB075F15D38920C /* AddToCalendarSheet.swift in Sources */,
 				8B3C666977E9DE83DAE78611 /* AdminHubView.swift in Sources */,
 				96CA599C3851AB298AFD04DB /* AiSuggestionSheet.swift in Sources */,
 				BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */,
@@ -526,6 +533,7 @@
 				82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */,
 				A5E6ADE515DD18B25AF07810 /* StreamPlayer.swift in Sources */,
 				2C2D824AEA0718B14BDE2F71 /* SupabaseService+Admin.swift in Sources */,
+				528FE0E6CA580B78E511B808 /* SupabaseService+Attend.swift in Sources */,
 				4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */,
 				0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */,
 				3610EDD386C4A8DA78702FE2 /* SupabaseService+Kyra.swift in Sources */,

@@ -43,6 +43,10 @@ struct CommunityView: View {
                 }
                 .refreshable { await appState.reloadCommunity() }
 
+                if selectedSegment == "My Circle" {
+                    bridgeBlock
+                }
+
                 if appState.accountStatus == .active {
                     fab
                 }
@@ -422,6 +426,39 @@ struct CommunityView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Bridge Block (My Circle only)
+
+    /// Persistent "Build a Bridge" entry point pinned just above the tab
+    /// bar, only while the "My Circle" segment is selected. Full-width but
+    /// inset on the trailing edge so it never sits under (or competes with
+    /// the tap target of) the floating Kyra "K" button.
+    private var bridgeBlock: some View {
+        NavigationLink {
+            BridgeShareView()
+        } label: {
+            COCard {
+                HStack(spacing: 14) {
+                    BridgeMotif(width: 46)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Build a Bridge")
+                            .font(.coUI(15, weight: .semibold))
+                            .foregroundColor(.coInk)
+                        Text("Invite someone into your circle")
+                            .font(.coUI(12))
+                            .foregroundColor(.coInkSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    COIcon(.chevronRight, size: 16, color: .coInkTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.leading, 22)
+        .padding(.trailing, 86)
+        .padding(.bottom, 66)
     }
 
     private var fab: some View {

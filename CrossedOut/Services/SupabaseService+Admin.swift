@@ -87,15 +87,31 @@ extension SupabaseService {
         let p_youtube_handle: String?
         let p_website_url: String?
         let p_contact_email: String?
+        // Visit-planning fields (migration 0032).
+        let p_address: String?
+        let p_service_times: String?
+        let p_parking_info: String?
+        let p_kids_info: String?
+        let p_accessibility_info: String?
+        let p_newcomer_info: String?
+        // system_admin only — a plain church_admin passing this is
+        // silently ignored server-side and falls back to their own church.
+        let p_church_id: UUID?
     }
 
     func updateMyChurch(
         name: String?, city: String?, denomination: String?, style: String?,
-        youtubeHandle: String?, websiteURL: String?, contactEmail: String?
+        youtubeHandle: String?, websiteURL: String?, contactEmail: String?,
+        address: String? = nil, serviceTimes: String? = nil, parkingInfo: String? = nil,
+        kidsInfo: String? = nil, accessibilityInfo: String? = nil, newcomerInfo: String? = nil,
+        churchID: UUID? = nil
     ) async throws {
         let params = UpdateMyChurchParams(
             p_name: name, p_city: city, p_denomination: denomination, p_style: style,
-            p_youtube_handle: youtubeHandle, p_website_url: websiteURL, p_contact_email: contactEmail
+            p_youtube_handle: youtubeHandle, p_website_url: websiteURL, p_contact_email: contactEmail,
+            p_address: address, p_service_times: serviceTimes, p_parking_info: parkingInfo,
+            p_kids_info: kidsInfo, p_accessibility_info: accessibilityInfo, p_newcomer_info: newcomerInfo,
+            p_church_id: churchID
         )
         try await client.rpc("update_my_church", params: params).execute()
     }

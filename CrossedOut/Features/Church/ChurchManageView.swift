@@ -20,6 +20,15 @@ struct ChurchManageView: View {
     @State private var website = ""
     @State private var contactEmail = ""
 
+    // Visit-planning fields (migration 0032) — shown on the Plan-a-Visit
+    // screen once a visitor has watched this church 2+ times.
+    @State private var address = ""
+    @State private var serviceTimes = ""
+    @State private var parkingInfo = ""
+    @State private var kidsInfo = ""
+    @State private var accessibilityInfo = ""
+    @State private var newcomerInfo = ""
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -46,6 +55,22 @@ struct ChurchManageView: View {
                                     autocapitalization: .never, keyboard: .URL, autocorrect: false)
                     ChurchTextField(label: "Contact email", placeholder: "Contact email", text: $contactEmail,
                                     autocapitalization: .never, keyboard: .emailAddress, autocorrect: false)
+
+                    Text("VISIT INFO")
+                        .font(.coUI(11, weight: .semibold))
+                        .foregroundColor(.coInkTertiary)
+                        .tracking(1.1)
+                        .padding(.top, 8)
+                    Text("Shown to a visitor once they've watched a few times — only fields you fill in appear.")
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkSecondary)
+
+                    ChurchTextField(label: "Address", placeholder: "123 Main St, City, State", text: $address)
+                    ChurchTextField(label: "Service times", placeholder: "e.g. Sundays 9:00 & 11:00 AM", text: $serviceTimes)
+                    ChurchTextField(label: "Parking", placeholder: "e.g. Free lot on the east side", text: $parkingInfo)
+                    ChurchTextField(label: "Kids check-in", placeholder: "e.g. Nursery through 5th grade at the west door", text: $kidsInfo)
+                    ChurchTextField(label: "Accessibility", placeholder: "e.g. Wheelchair ramp at the main entrance", text: $accessibilityInfo)
+                    ChurchTextField(label: "Newcomers", placeholder: "e.g. Look for the Guest Services table in the lobby", text: $newcomerInfo)
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -101,6 +126,12 @@ struct ChurchManageView: View {
             youtube = c.youtubeHandle ?? ""
             website = c.websiteURL ?? ""
             contactEmail = c.contactEmail ?? ""
+            address = c.address ?? ""
+            serviceTimes = c.serviceTimes ?? ""
+            parkingInfo = c.parkingInfo ?? ""
+            kidsInfo = c.kidsInfo ?? ""
+            accessibilityInfo = c.accessibilityInfo ?? ""
+            newcomerInfo = c.newcomerInfo ?? ""
         }
         isLoading = false
     }
@@ -115,7 +146,10 @@ struct ChurchManageView: View {
                     name: name, city: city,
                     denomination: emptyToNil(denomination), style: style,
                     youtubeHandle: emptyToNil(youtube), websiteURL: emptyToNil(website),
-                    contactEmail: emptyToNil(contactEmail)
+                    contactEmail: emptyToNil(contactEmail),
+                    address: emptyToNil(address), serviceTimes: emptyToNil(serviceTimes),
+                    parkingInfo: emptyToNil(parkingInfo), kidsInfo: emptyToNil(kidsInfo),
+                    accessibilityInfo: emptyToNil(accessibilityInfo), newcomerInfo: emptyToNil(newcomerInfo)
                 )
                 await load()
                 isSaving = false

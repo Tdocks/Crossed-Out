@@ -42,3 +42,4 @@ targets:
           - Inter-Italic.ttf
         ITSAppUsesNonExemptEncryption: false
         CFBundleDisplayName: Crossed Out
+        NSCalendarsWriteOnlyAccessUsageDescription: "Crossed Out can add a calendar event when you plan a church visit."
