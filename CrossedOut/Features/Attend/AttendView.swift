@@ -9,17 +9,21 @@ struct AttendView: View {
 
     /// Currently-live services (from the real feed; the hero + any extras).
     private var liveServices: [LiveService] {
-        appState.services.filter { $0.isLive }
+        appState.services.filter { $0.bucket == .live }
     }
 
-    /// Unscheduled, not-yet-live services ("18m", "45m").
-    private var startingSoonServices: [LiveService] {
-        appState.services.filter { !$0.isLive && $0.time == nil }
+    /// Scheduled to start within the next few hours — shows a live countdown.
+    private var soonServices: [LiveService] {
+        appState.services.filter { $0.bucket == .soon }.sorted(by: Self.byStart)
     }
 
-    /// Time-scheduled services (e.g. "9:00 AM").
-    private var tomorrowServicesList: [LiveService] {
-        appState.services.filter { !$0.isLive && $0.time != nil }
+    /// Scheduled further out (later today / upcoming days).
+    private var laterServices: [LiveService] {
+        appState.services.filter { $0.bucket == .later }.sorted(by: Self.byStart)
+    }
+
+    private static func byStart(_ a: LiveService, _ b: LiveService) -> Bool {
+        (a.scheduledStartAt ?? .distantFuture) < (b.scheduledStartAt ?? .distantFuture)
     }
 
     var body: some View {
@@ -44,13 +48,20 @@ struct AttendView: View {
                                 message: "Check back Sunday morning — or explore churches near you."
                             )
                         } else {
+                            if liveServices.isEmpty && soonServices.isEmpty && laterServices.isEmpty {
+                                COEmptyState(
+                                    icon: .attend,
+                                    title: "No services scheduled right now",
+                                    message: "Check back before a service — or explore churches near you."
+                                )
+                            }
                             if !liveServices.isEmpty {
                                 liveNowSection
                             }
-                            if !startingSoonServices.isEmpty {
+                            if !soonServices.isEmpty {
                                 startingSoonSection
                             }
-                            if !tomorrowServicesList.isEmpty {
+                            if !laterServices.isEmpty {
                                 tomorrowSection
                             }
                         }
@@ -169,9 +180,9 @@ struct AttendView: View {
             COSectionHeader(title: "Starting Soon")
                 .padding(.bottom, 10)
             VStack(spacing: 0) {
-                ForEach(Array(startingSoonServices.enumerated()), id: \.element.id) { index, service in
-                    ServiceRow(service: service, rightLabel: service.startsIn)
-                    if index < startingSoonServices.count - 1 {
+                ForEach(Array(soonServices.enumerated()), id: \.element.id) { index, service in
+                    ServiceRow(service: service, rightLabel: service.scheduleLabel)
+                    if index < soonServices.count - 1 {
                         CODivider()
                     }
                 }
@@ -179,16 +190,16 @@ struct AttendView: View {
         }
     }
 
-    // MARK: Tomorrow Morning
+    // MARK: Upcoming
 
     private var tomorrowSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            COSectionHeader(title: "Tomorrow Morning")
+            COSectionHeader(title: "Upcoming")
                 .padding(.bottom, 10)
             VStack(spacing: 0) {
-                ForEach(Array(tomorrowServicesList.enumerated()), id: \.element.id) { index, service in
-                    ServiceRow(service: service, rightLabel: service.time ?? service.startsIn)
-                    if index < tomorrowServicesList.count - 1 {
+                ForEach(Array(laterServices.enumerated()), id: \.element.id) { index, service in
+                    ServiceRow(service: service, rightLabel: service.scheduleLabel)
+                    if index < laterServices.count - 1 {
                         CODivider()
                     }
                 }
@@ -253,22 +264,32 @@ private struct AllServicesSheet: View {
     let services: [LiveService]
     @Environment(\.dismiss) private var dismiss
 
+    /// Only live or scheduled services — never a church with no broadcast info.
+    private var visible: [LiveService] {
+        services
+            .filter { $0.bucket != .hidden }
+            .sorted { a, b in
+                if a.isLive != b.isLive { return a.isLive }
+                return (a.scheduledStartAt ?? .distantFuture) < (b.scheduledStartAt ?? .distantFuture)
+            }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.coPaper.ignoresSafeArea()
-                if services.isEmpty {
+                if visible.isEmpty {
                     COEmptyState(
                         icon: .attend,
                         title: "No services right now",
-                        message: "Check back Sunday morning — or explore churches near you."
+                        message: "Check back before a service — or explore churches near you."
                     )
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 0) {
-                            ForEach(Array(services.enumerated()), id: \.element.id) { index, service in
-                                ServiceRow(service: service, rightLabel: service.time ?? service.startsIn)
-                                if index < services.count - 1 {
+                            ForEach(Array(visible.enumerated()), id: \.element.id) { index, service in
+                                ServiceRow(service: service, rightLabel: service.isLive ? "Live" : service.scheduleLabel)
+                                if index < visible.count - 1 {
                                     CODivider()
                                 }
                             }

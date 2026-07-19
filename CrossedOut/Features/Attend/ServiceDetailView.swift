@@ -129,7 +129,7 @@ private extension ServiceDetailView {
             Text("·")
             Text("\(String(format: "%.1f", service.church.rating)) ★")
             Text("·")
-            Text(service.isLive ? viewerLabel : service.startsIn)
+            Text(service.isLive ? viewerLabel : service.scheduleLabel)
         }
         .font(.coUI(12))
         .foregroundColor(.coInkTertiary)
@@ -227,8 +227,12 @@ private extension ServiceDetailView {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         if service.isLive {
             startWatching()
+        } else if let vid = service.upcomingVideoId, !vid.isEmpty,
+                  let url = URL(string: "https://www.youtube.com/watch?v=\(vid)") {
+            // Upcoming broadcast: open its page so the viewer can tap "Notify me".
+            openURL(url)
         } else {
-            // Non-live: lightweight reminder confirmation (real APNs scheduling TBD).
+            // No scheduled video — lightweight reminder confirmation (APNs TBD).
             guard !isPrimaryBusy else { return }
             isPrimaryBusy = true
             withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "Reminder set." }

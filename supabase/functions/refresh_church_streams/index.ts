@@ -66,11 +66,18 @@ async function searchLiveVideoId(channelId: string): Promise<string | null> {
   return data.items?.[0]?.id?.videoId ?? null;
 }
 
-// Authoritative confirmation + viewer counts. 1 quota unit per <=50 ids.
-async function confirmLive(
-  videoIds: string[],
-): Promise<Map<string, { live: boolean; viewers: number | null }>> {
-  const out = new Map<string, { live: boolean; viewers: number | null }>();
+// Authoritative confirmation. 1 quota unit per <=50 ids. Returns the broadcast
+// status ("live" / "upcoming" / "none"), viewer count, scheduled start time,
+// and title — so callers can surface scheduled streams, not just live ones.
+type StreamStatus = {
+  status: "live" | "upcoming" | "none";
+  viewers: number | null;
+  scheduledStart: string | null;
+  title: string | null;
+};
+
+async function confirmStreams(videoIds: string[]): Promise<Map<string, StreamStatus>> {
+  const out = new Map<string, StreamStatus>();
   for (let i = 0; i < videoIds.length; i += 50) {
     const chunk = videoIds.slice(i, i + 50);
     const url = new URL("https://www.googleapis.com/youtube/v3/videos");
@@ -81,9 +88,14 @@ async function confirmLive(
     if (!res.ok) throw new Error(`videos.list failed ${res.status}: ${await res.text()}`);
     const data = await res.json();
     for (const item of data.items ?? []) {
-      const live = item.snippet?.liveBroadcastContent === "live"; // not "upcoming"/"none"
+      const lbc = item.snippet?.liveBroadcastContent; // "live" | "upcoming" | "none"
       const cv = item.liveStreamingDetails?.concurrentViewers;
-      out.set(item.id, { live, viewers: cv ? parseInt(cv, 10) : null });
+      out.set(item.id, {
+        status: lbc === "live" ? "live" : lbc === "upcoming" ? "upcoming" : "none",
+        viewers: cv ? parseInt(cv, 10) : null,
+        scheduledStart: item.liveStreamingDetails?.scheduledStartTime ?? null,
+        title: item.snippet?.title ?? null,
+      });
     }
   }
   return out;
@@ -148,15 +160,15 @@ Deno.serve(async (req) => {
   }
 
   const idsToConfirm = [...new Set(candidates.filter((c) => c.videoId).map((c) => c.videoId!))];
-  let statuses = new Map<string, { live: boolean; viewers: number | null }>();
+  let statuses = new Map<string, StreamStatus>();
   let confirmError: string | null = null;
   try {
-    if (idsToConfirm.length > 0) statuses = await confirmLive(idsToConfirm);
+    if (idsToConfirm.length > 0) statuses = await confirmStreams(idsToConfirm);
   } catch (e) {
     confirmError = String(e);
   }
 
-  let liveCount = 0, offlineCount = 0, skipped = 0;
+  let liveCount = 0, upcomingCount = 0, offlineCount = 0, skipped = 0;
   for (const c of candidates) {
     if (!c.scrapeOk || confirmError) {
       // Transient failure: don't kill a possibly-live embed; just stamp the check.
@@ -164,23 +176,43 @@ Deno.serve(async (req) => {
       await supabase.from("churches").update({ last_checked_at: now }).eq("id", c.churchId);
       continue;
     }
-    const status = c.videoId ? statuses.get(c.videoId) : undefined;
-    const isLive = !!status?.live;
-    const update = isLive
-      ? { is_live: true, live_video_id: c.videoId, viewers: status?.viewers ?? null, last_checked_at: now }
-      : { is_live: false, live_video_id: null, viewers: null, last_checked_at: now };
-    const { error: upErr } = await supabase.from("churches").update(update).eq("id", c.churchId);
-    if (upErr) console.error(`update failed for ${c.churchId}: ${upErr.message}`);
-    else isLive ? liveCount++ : offlineCount++;
+    const st = c.videoId ? statuses.get(c.videoId) : undefined;
+    const kind = st?.status ?? "none";
 
-    // Keep live_services in sync so existing app queries stay correct.
-    await supabase.from("live_services").update({ is_live: isLive }).eq("church_id", c.churchId);
+    if (kind === "live") {
+      await supabase.from("churches").update({
+        is_live: true, live_video_id: c.videoId, viewers: st?.viewers ?? null, last_checked_at: now,
+      }).eq("id", c.churchId);
+      const ls: Record<string, unknown> = { is_live: true, scheduled_start_at: null, upcoming_video_id: null };
+      if (st?.title) ls.title = st.title;
+      await supabase.from("live_services").update(ls).eq("church_id", c.churchId);
+      liveCount++;
+    } else if (kind === "upcoming") {
+      await supabase.from("churches").update({
+        is_live: false, live_video_id: null, viewers: null, last_checked_at: now,
+      }).eq("id", c.churchId);
+      const ls: Record<string, unknown> = {
+        is_live: false, scheduled_start_at: st?.scheduledStart ?? null, upcoming_video_id: c.videoId,
+      };
+      if (st?.title) ls.title = st.title;
+      await supabase.from("live_services").update(ls).eq("church_id", c.churchId);
+      upcomingCount++;
+    } else {
+      await supabase.from("churches").update({
+        is_live: false, live_video_id: null, viewers: null, last_checked_at: now,
+      }).eq("id", c.churchId);
+      await supabase.from("live_services").update({
+        is_live: false, scheduled_start_at: null, upcoming_video_id: null,
+      }).eq("church_id", c.churchId);
+      offlineCount++;
+    }
   }
 
   return new Response(
     JSON.stringify({
       checked: candidates.length,
       live: liveCount,
+      upcoming: upcomingCount,
       offline: offlineCount,
       skipped_transient: skipped,
       confirm_error: confirmError,

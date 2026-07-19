@@ -270,6 +270,8 @@ struct LiveServiceDTO: Codable {
     let startsIn: String?
     let serviceTime: String?
     let isLive: Bool
+    let scheduledStartAt: String?
+    let upcomingVideoId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -278,16 +280,24 @@ struct LiveServiceDTO: Codable {
         case startsIn = "starts_in"
         case serviceTime = "service_time"
         case isLive = "is_live"
+        case scheduledStartAt = "scheduled_start_at"
+        case upcomingVideoId = "upcoming_video_id"
     }
 
     func toModel(church: Church) -> LiveService {
-        LiveService(
+        // scheduled_start_at is only parsed when present, so a service with no
+        // upcoming broadcast keeps a nil date (and is filtered out of the feed).
+        let scheduled: Date? = (scheduledStartAt?.isEmpty == false)
+            ? SupabaseService.parseISODate(scheduledStartAt) : nil
+        return LiveService(
             id: id,
             church: church,
             title: title,
             startsIn: startsIn ?? "",
             isLive: isLive,
-            time: serviceTime
+            time: serviceTime,
+            scheduledStartAt: scheduled,
+            upcomingVideoId: upcomingVideoId
         )
     }
 }

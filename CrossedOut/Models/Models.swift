@@ -245,6 +245,53 @@ struct LiveService: Identifiable, Codable, Hashable {
     let startsIn: String
     let isLive: Bool
     var time: String?
+    /// Scheduled start of the next upcoming broadcast (nil when live or none).
+    /// Written by refresh_church_streams (migration 0038).
+    var scheduledStartAt: Date? = nil
+    /// videoId of the upcoming broadcast, so we can open its watch/notify page.
+    var upcomingVideoId: String? = nil
+}
+
+// MARK: - Live service scheduling
+
+enum ServiceBucket { case live, soon, later, hidden }
+
+extension LiveService {
+    /// Which Attend section this belongs in, computed live so a service that
+    /// has no live-or-scheduled info simply disappears instead of rendering a
+    /// blank, indicator-less row.
+    var bucket: ServiceBucket {
+        if isLive { return .live }
+        if let start = scheduledStartAt {
+            let delta = start.timeIntervalSinceNow
+            if delta < -3600 { return .hidden }   // long past; stale
+            if delta < 6 * 3600 { return .soon }  // within the next 6 hours
+            return .later
+        }
+        // Legacy seed/mock services carry text-only schedule fields.
+        if let t = time, !t.isEmpty { return .later }
+        if !startsIn.isEmpty { return .soon }
+        return .hidden
+    }
+
+    /// Human display of when this service airs, computed live so countdowns
+    /// stay fresh: "Live", "Starts in 5m", "Starts 9:00 AM", "Sun 8:50 AM".
+    var scheduleLabel: String {
+        if isLive { return "Live" }
+        if let start = scheduledStartAt {
+            let delta = start.timeIntervalSinceNow
+            if delta <= 0 { return "Starting now" }
+            if delta < 3600 { return "Starts in \(max(1, Int((delta / 60).rounded())))m" }
+            let cal = Calendar.current
+            let f = DateFormatter()
+            if cal.isDateInToday(start) { f.dateFormat = "h:mm a"; return "Starts \(f.string(from: start))" }
+            if cal.isDateInTomorrow(start) { f.dateFormat = "h:mm a"; return "Tomorrow \(f.string(from: start))" }
+            f.dateFormat = "EEE h:mm a"
+            return f.string(from: start)
+        }
+        if let t = time, !t.isEmpty { return t }
+        return startsIn
+    }
 }
 
 struct GiveProject: Identifiable, Codable, Hashable {
