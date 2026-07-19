@@ -75,12 +75,30 @@ struct CommunityView: View {
                 let dy = value.translation.height
                 guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
                 guard let i = segments.firstIndex(of: selectedSegment) else { return }
-                if dx < 0, i < segments.count - 1 {
-                    withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segments[i + 1] }
-                } else if dx > 0, i > 0, value.startLocation.x > 44 {
-                    withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segments[i - 1] }
+                if dx < 0 {
+                    if i < segments.count - 1 {
+                        withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segments[i + 1] }
+                    } else {
+                        moveTab(1)   // past the last segment → next tab (Attend)
+                    }
+                } else if dx > 0, value.startLocation.x > 44 {
+                    if i > 0 {
+                        withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segments[i - 1] }
+                    } else {
+                        moveTab(-1)  // before the first segment → previous tab (Bible)
+                    }
                 }
             }
+    }
+
+    /// Hands the swipe off to the adjacent app tab when at a segment boundary,
+    /// so Micro → (swipe) → Attend, and My Circle → (swipe) → Bible.
+    private func moveTab(_ delta: Int) {
+        let tabs = COTab.allCases
+        guard let i = tabs.firstIndex(of: .community) else { return }
+        let j = i + delta
+        guard tabs.indices.contains(j) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) { appState.selectedTab = tabs[j] }
     }
 
     private func loadMemberships() async {

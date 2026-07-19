@@ -53,10 +53,14 @@ struct ChurchFinderView: View {
                             message: "Try widening your search area."
                         )
                     } else if filteredChurches.isEmpty {
+                        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
                         COEmptyState(
                             icon: .church,
-                            title: "No churches match this filter",
-                            message: "Try a different style, or choose All to see everything nearby."
+                            title: q.isEmpty ? "No churches match this filter"
+                                             : "No churches found for “\(q)”",
+                            message: q.isEmpty
+                                ? "Try a different style, or choose All to see everything."
+                                : "We're adding churches all the time. Try another name or city — or suggest this one below."
                         )
                     } else {
                         VStack(spacing: 12) {

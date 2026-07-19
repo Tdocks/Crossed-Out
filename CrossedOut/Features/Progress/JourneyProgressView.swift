@@ -10,6 +10,7 @@ struct JourneyProgressView: View {
     @State private var showAddWorking = false
     @State private var showBridgeInvite = false
     @State private var pathDetailDay: Int?
+    @State private var selectedBadge: FormationBadge?
 
     private var workingThrough: [WorkingItem] { appState.workingItems }
     private var streak: StreakState { appState.streak }
@@ -144,6 +145,10 @@ struct JourneyProgressView: View {
                 )
                 .environmentObject(appState)
             }
+        }
+        .sheet(item: $selectedBadge) { badge in
+            BadgeDetailSheet(badge: badge)
+                .presentationDetents([.medium])
         }
         .task { await appState.reloadJourney() }
     }
@@ -339,7 +344,13 @@ struct JourneyProgressView: View {
                 spacing: 10
             ) {
                 ForEach(appState.badges) { badge in
-                    badgeTile(badge)
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        selectedBadge = badge
+                    } label: {
+                        badgeTile(badge)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -706,6 +717,85 @@ private struct AddWorkingItemSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Badge detail sheet
+
+private struct BadgeDetailSheet: View {
+    let badge: FormationBadge
+    @Environment(\.dismiss) private var dismiss
+
+    private var tint: Color {
+        switch badge.tint {
+        case .flame: return .coCrossRed
+        case .gold: return .coGold
+        case .olive: return .coOlive
+        case .ink: return .coInkSecondary
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .fill(badge.isEarned ? tint.opacity(0.14) : Color.coPaperSecondary)
+                    .frame(width: 76, height: 76)
+                if badge.isEarned {
+                    Circle()
+                        .strokeBorder(tint.opacity(0.45), lineWidth: 1.5)
+                        .frame(width: 76, height: 76)
+                }
+                COIcon(badge.icon, size: 34, color: badge.isEarned ? tint : .coInkTertiary)
+            }
+            .padding(.top, 10)
+
+            VStack(spacing: 6) {
+                Text(badge.title)
+                    .font(.coDisplay(22, weight: .semibold))
+                    .foregroundColor(.coInk)
+                Text(badge.isEarned ? "Earned" : "Locked")
+                    .font(.coUI(11, weight: .semibold))
+                    .tracking(1)
+                    .textCase(.uppercase)
+                    .foregroundColor(badge.isEarned ? .coOlive : .coInkTertiary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("HOW TO EARN IT")
+                    .font(.coUI(11, weight: .semibold))
+                    .tracking(1)
+                    .foregroundColor(.coInkTertiary)
+                Text(badge.subtitle)
+                    .font(.coUI(15))
+                    .foregroundColor(.coInk)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Color.coCard)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            if badge.isEarned, let date = badge.earnedAt {
+                Text("Earned \(earnedString(date))")
+                    .font(.coUI(12))
+                    .foregroundColor(.coInkTertiary)
+            }
+
+            Spacer()
+
+            COSecondaryButton(title: "Close") { dismiss() }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .background(Color.coPaper.ignoresSafeArea())
+    }
+
+    private func earnedString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f.string(from: date)
     }
 }
 
