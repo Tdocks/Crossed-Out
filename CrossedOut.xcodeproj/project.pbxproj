@@ -28,6 +28,7 @@
 		3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */; };
 		459AF94C948FC8FD56AC98C4 /* SupabaseService+Legal.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBB59E6DC0DF1358CBE1579 /* SupabaseService+Legal.swift */; };
 		45EBCA48F29A7A768D454731 /* DevotionalsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */; };
+		488030720690372FFE6C2C39 /* SupabaseService+Explore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7EBA9FD90CE6251521DFF9B /* SupabaseService+Explore.swift */; };
 		4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */; };
 		4C9B484BAEEEE3E52A9A29C5 /* CrossedOutWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E3FB65C96831746B11C0FE /* CrossedOutWidgets.swift */; };
 		528FE0E6CA580B78E511B808 /* SupabaseService+Attend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */; };
@@ -174,6 +175,7 @@
 		CFAB2A4D5858861B1DF71C45 /* BridgeComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeComposerView.swift; sourceTree = "<group>"; };
 		D4C2068096DEA50273F324B8 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		D722B64EEA03E7C1D5D3586D /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		D7EBA9FD90CE6251521DFF9B /* SupabaseService+Explore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Explore.swift"; sourceTree = "<group>"; };
 		D867BC82BB6EE744CBC03EB5 /* CrossedOut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrossedOut.entitlements; sourceTree = "<group>"; };
 		DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSheet.swift; sourceTree = "<group>"; };
 		DBBB59E6DC0DF1358CBE1579 /* SupabaseService+Legal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Legal.swift"; sourceTree = "<group>"; };
@@ -392,6 +394,7 @@
 				7B021856464D7386FB22045A /* SupabaseService+Badges.swift */,
 				A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */,
 				CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */,
+				D7EBA9FD90CE6251521DFF9B /* SupabaseService+Explore.swift */,
 				37A84803C9A480BD18E6F4E7 /* SupabaseService+Journey.swift */,
 				898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */,
 				DBBB59E6DC0DF1358CBE1579 /* SupabaseService+Legal.swift */,
@@ -681,6 +684,7 @@
 				112B652CA281B417ADA7A879 /* SupabaseService+Badges.swift in Sources */,
 				4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */,
 				0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */,
+				488030720690372FFE6C2C39 /* SupabaseService+Explore.swift in Sources */,
 				3CCDB9709FC2C5B863581E71 /* SupabaseService+Journey.swift in Sources */,
 				3610EDD386C4A8DA78702FE2 /* SupabaseService+Kyra.swift in Sources */,
 				459AF94C948FC8FD56AC98C4 /* SupabaseService+Legal.swift in Sources */,
