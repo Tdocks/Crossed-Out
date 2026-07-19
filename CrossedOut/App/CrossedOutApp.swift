@@ -9,8 +9,14 @@ struct CrossedOutApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .environmentObject(SubscriptionService.shared)
                 .tint(.coCrossRed)
                 .preferredColorScheme(COAppearance(rawValue: appearanceRaw)?.colorScheme)
+                .task {
+                    AnalyticsService.shared.start()
+                    await SubscriptionService.shared.start()
+                    appState.refreshPlusFromSubscriptions()
+                }
                 .onAppear {
                     #if DEBUG
                     Typography.debugPrintFonts()

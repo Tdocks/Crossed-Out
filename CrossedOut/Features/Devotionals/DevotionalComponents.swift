@@ -266,7 +266,10 @@ struct DevotionalDetailView: View {
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            Task { await SupabaseService.shared.recordCompletion(kind: "devotional") }
+            Task {
+                await SupabaseService.shared.recordCompletion(kind: "devotional")
+                await SupabaseService.shared.awardEarnedBadges()
+            }
         }
     }
 }

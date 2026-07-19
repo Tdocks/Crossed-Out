@@ -317,6 +317,7 @@ struct CommunityView: View {
             let requestID = request.id
             Task {
                 _ = await SupabaseService.shared.prayFor(requestID: requestID)
+                await appState.recordActivity(kind: "community")
             }
         } label: {
             Text(isPrayed ? "Prayed" : "Pray")

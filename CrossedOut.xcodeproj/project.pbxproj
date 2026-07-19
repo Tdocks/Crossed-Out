@@ -11,19 +11,25 @@
 		08C6FFC53D2BE341C3DEA8D2 /* ChurchManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6236882D76D535B839A7EEF /* ChurchManageView.swift */; };
 		0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */; };
 		112AEB5D7888FCA0D8122969 /* BridgeComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFAB2A4D5858861B1DF71C45 /* BridgeComposerView.swift */; };
+		112B652CA281B417ADA7A879 /* SupabaseService+Badges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B021856464D7386FB22045A /* SupabaseService+Badges.swift */; };
 		1429F8BC18D96F26E8EBED59 /* CrossedOutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8817ED9B69880386FF44CCF4 /* CrossedOutApp.swift */; };
 		181037C41BB02857ECE062B5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583F1B69EE280361D4A18B79 /* Components.swift */; };
+		18EA29928D002EAF247977E2 /* PlusPaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9791AD109D3CAA8FD9A9AB02 /* PlusPaywallView.swift */; };
+		195A2678B3CC38610DC063F2 /* SupabaseService+Subscriptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81816E1AF9EF16D372AC064A /* SupabaseService+Subscriptions.swift */; };
 		1E843D70D7E9F8C56B6A55EF /* Inter-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 314A2153E9CC5E81022CB9EF /* Inter-Italic.ttf */; };
 		20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301F62AED89C820CD3369957 /* ServiceDetailView.swift */; };
+		20C5C868F10D8B13DB4EE8D1 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA05B4E701CF921583B2C22E /* AnalyticsService.swift */; };
 		20D200C1A012404A338C0F35 /* TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFA439125C7FB6B3DC9361B /* TabBar.swift */; };
 		29C3C08C042DBD4D2AFC7567 /* JourneyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8418F244D418C4D90CD398C /* JourneyProgressView.swift */; };
 		2C2D824AEA0718B14BDE2F71 /* SupabaseService+Admin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B86CF24DDF450708EDC414 /* SupabaseService+Admin.swift */; };
 		3610EDD386C4A8DA78702FE2 /* SupabaseService+Kyra.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */; };
 		3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB434650612A2DEA8A15E75 /* EmptyState.swift */; };
+		3CCDB9709FC2C5B863581E71 /* SupabaseService+Journey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A84803C9A480BD18E6F4E7 /* SupabaseService+Journey.swift */; };
 		3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */; };
 		459AF94C948FC8FD56AC98C4 /* SupabaseService+Legal.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBBB59E6DC0DF1358CBE1579 /* SupabaseService+Legal.swift */; };
 		45EBCA48F29A7A768D454731 /* DevotionalsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */; };
 		4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */; };
+		4C9B484BAEEEE3E52A9A29C5 /* CrossedOutWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04E3FB65C96831746B11C0FE /* CrossedOutWidgets.swift */; };
 		528FE0E6CA580B78E511B808 /* SupabaseService+Attend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */; };
 		53CF5D584110140D5EC53180 /* AttendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D763F517ED1ACDD00971A01 /* AttendView.swift */; };
 		5C1B817C91057A4B7D0FBB38 /* KyraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7895D987D6316A315E2BE5C0 /* KyraView.swift */; };
@@ -32,15 +38,20 @@
 		5DA189509854DA521BFA0ED0 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF0243F6C54046B4E1FBB35 /* TodayView.swift */; };
 		5FDFABA1360DCE82F2A126E8 /* Icons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4A83A506B6EF6EB332363A /* Icons.swift */; };
 		609D7C80470BE9C788E18390 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D722B64EEA03E7C1D5D3586D /* Theme.swift */; };
+		619A2CA17D28D848EFCFE417 /* PathPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16F51D67613210D704EE7AB /* PathPickerSheet.swift */; };
 		66535BF74709A253E785EAE7 /* Inter.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 92844B9A5A8AE42B2D505A3D /* Inter.ttf */; };
 		67FD6C93898D75B938F6D671 /* CommunityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA5558BACBD522E5204A0D58 /* CommunityView.swift */; };
 		701E25D0DC30B363CF8E9188 /* LegalDocuments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C25B8FE11089F504B853D2D /* LegalDocuments.swift */; };
 		718E58F37AC21CFEAC13D45F /* CrisisSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA313CE758BF252E8A734716 /* CrisisSupportView.swift */; };
 		71A9F23F90AF5155B0D6BEA3 /* LegalConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1857AC2A298FD8CD86D89D /* LegalConsentView.swift */; };
+		727EAA6956745489D7A2D323 /* PlusProducts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FAEF6C26A5AF2611C6AA164 /* PlusProducts.swift */; };
+		737C728F95D1B39F64EAF067 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = F08489E9FDE925AE3673B800 /* TelemetryDeck */; };
 		73D4E5549A3BE2E97C769F17 /* PlayfairDisplay-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 6D009328117B445BCDD40BDE /* PlayfairDisplay-Italic.ttf */; };
+		7D32F674D002BAAC74ECA747 /* CrossedOutWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 215D9A57FD56EC79B037B86C /* CrossedOutWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7E682B2980D675865C0298A5 /* PendingVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63C5E6B6D46127C9D25F076 /* PendingVerificationView.swift */; };
 		82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E416CE180C9BE0CF3CED42AF /* SettingsView.swift */; };
 		83BB1E5EFFEE74E103313217 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68BF5D32AC54F55EEA766FA /* ExploreView.swift */; };
+		8B088C7B9F4F51BA985CC2EE /* AppSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4760CD9F4BA0D0FCC196FF3B /* AppSecrets.swift */; };
 		8B3C666977E9DE83DAE78611 /* AdminHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC67B2923A5BC14C0AA2998 /* AdminHubView.swift */; };
 		8C4860A0B6ADAF1F7BA2D705 /* BibleReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE4842808F2C29861BB2A2A3 /* BibleReaderView.swift */; };
 		8F75FF81E30F1183F51A1BE1 /* BridgeVersePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F381F39EB12D689377727E0 /* BridgeVersePicker.swift */; };
@@ -49,10 +60,14 @@
 		9912F6A302F8E2637C5311F1 /* ReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */; };
 		9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01608714F91323B05EDC5DFF /* RootView.swift */; };
 		A5E6ADE515DD18B25AF07810 /* StreamPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100027DD7B644073BE579B7 /* StreamPlayer.swift */; };
+		A7396BCB84A27AA544C7D631 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = C642A57E5A4AFA2EAEB02451 /* Sentry */; };
 		AB542AEE8EB075F15D38920C /* AddToCalendarSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD4C9FC4313ABC3760FEC3F /* AddToCalendarSheet.swift */; };
+		ABAE013FCCB8A023AE2936FC /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F1869D01464C15D55E9FCE /* AppGroupStore.swift */; };
+		AD73053E25FE1B6D00791F30 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C98B28C98696306A44E26478 /* SubscriptionService.swift */; };
 		B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBADC0D395ABBA82AFE67F38 /* AuthSheet.swift */; };
 		B8E303DD8B56441988EA9AD2 /* ChurchFormComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B277E2A63E6A9BDEB6BE02BE /* ChurchFormComponents.swift */; };
 		BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF74E32355BCCC414036E57 /* AppState.swift */; };
+		C35FF1B285FF76594C3F1D10 /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F1869D01464C15D55E9FCE /* AppGroupStore.swift */; };
 		C68DBCF8C4D5107C748E51CD /* PlayfairDisplay-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */; };
 		C7ACBE3733A8F4465DCE840B /* BridgeShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244B30446FDFB2BFF005543F /* BridgeShareView.swift */; };
 		C9D6AA83F8569FA7A81F3C22 /* KyraMessageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DF482A1FE091FDC4ADDF28 /* KyraMessageRenderer.swift */; };
@@ -63,28 +78,62 @@
 		D7AE2345B38CF7BAC7199185 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C2068096DEA50273F324B8 /* OnboardingView.swift */; };
 		D8F02082223345F0AFFDCE06 /* GiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F561C6AE240BA583BB15B21F /* GiveView.swift */; };
 		E37A40020E3EF057E9EA74FD /* ModerationQueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11868B00CFF60846A3EAC21 /* ModerationQueueView.swift */; };
+		F1ACFE70D3E1A560BBE620C3 /* FormationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B1EB1A42FB714AE05D8031 /* FormationBadge.swift */; };
 		F35B4C061FAFBB8BC2BE69A3 /* SupabaseService+Micros.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B23FBED4A6F0CCA45C6844 /* SupabaseService+Micros.swift */; };
+		F5CBBD838B6E03C39297A8A5 /* PathDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D83C9CA8CD9B6CA8058B09 /* PathDetailView.swift */; };
 		F82E556AE2C8E6D2E11DD008 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7ADFEC8C7333827E1855842 /* SupabaseService.swift */; };
 		FA5888A5F223972119647F7C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 98A8D907E1389379E19C011E /* Supabase */; };
 		FCE7461847B69581F6565E67 /* MicroViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA326AF9C43C54E22F53A55C /* MicroViews.swift */; };
 		FD06D0F71A43E415BC791A96 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A9844F06CCD645DD9C91A8D /* Models.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		60CBFA3CDB9A009CA5363EAF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 26EF315AD75529FD906FA9EE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 46A291D45EFBB41A9C36411E;
+			remoteInfo = CrossedOutWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A287DE58856DCF7130442B25 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7D32F674D002BAAC74ECA747 /* CrossedOutWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		01608714F91323B05EDC5DFF /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		04E3FB65C96831746B11C0FE /* CrossedOutWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossedOutWidgets.swift; sourceTree = "<group>"; };
 		05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevotionalsHubView.swift; sourceTree = "<group>"; };
 		0A9844F06CCD645DD9C91A8D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		0D4A83A506B6EF6EB332363A /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
 		19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CrossedOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		215D9A57FD56EC79B037B86C /* CrossedOutWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CrossedOutWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		244B30446FDFB2BFF005543F /* BridgeShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeShareView.swift; sourceTree = "<group>"; };
+		27F1869D01464C15D55E9FCE /* AppGroupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupStore.swift; sourceTree = "<group>"; };
 		2BC850C24445A437BED5E29A /* DevotionalComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevotionalComponents.swift; sourceTree = "<group>"; };
 		301F62AED89C820CD3369957 /* ServiceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceDetailView.swift; sourceTree = "<group>"; };
 		314A2153E9CC5E81022CB9EF /* Inter-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Italic.ttf"; sourceTree = "<group>"; };
+		37A84803C9A480BD18E6F4E7 /* SupabaseService+Journey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Journey.swift"; sourceTree = "<group>"; };
 		3CFA439125C7FB6B3DC9361B /* TabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBar.swift; sourceTree = "<group>"; };
+		4760CD9F4BA0D0FCC196FF3B /* AppSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSecrets.swift; sourceTree = "<group>"; };
 		4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlayfairDisplay-Regular.ttf"; sourceTree = "<group>"; };
+		4C775715827A5780ED421BBF /* CrossedOutWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrossedOutWidgets.entitlements; sourceTree = "<group>"; };
 		4D763F517ED1ACDD00971A01 /* AttendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendView.swift; sourceTree = "<group>"; };
 		4F381F39EB12D689377727E0 /* BridgeVersePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeVersePicker.swift; sourceTree = "<group>"; };
+		4FAEF6C26A5AF2611C6AA164 /* PlusProducts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlusProducts.swift; sourceTree = "<group>"; };
 		4FF0243F6C54046B4E1FBB35 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		55B1EB1A42FB714AE05D8031 /* FormationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormationBadge.swift; sourceTree = "<group>"; };
 		583F1B69EE280361D4A18B79 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		5C25B8FE11089F504B853D2D /* LegalDocuments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocuments.swift; sourceTree = "<group>"; };
 		61B23FBED4A6F0CCA45C6844 /* SupabaseService+Micros.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Micros.swift"; sourceTree = "<group>"; };
@@ -92,20 +141,25 @@
 		70915A1FA5552010F52A190A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		72B86CF24DDF450708EDC414 /* SupabaseService+Admin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Admin.swift"; sourceTree = "<group>"; };
 		7895D987D6316A315E2BE5C0 /* KyraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyraView.swift; sourceTree = "<group>"; };
+		7B021856464D7386FB22045A /* SupabaseService+Badges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Badges.swift"; sourceTree = "<group>"; };
 		7CB434650612A2DEA8A15E75 /* EmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyState.swift; sourceTree = "<group>"; };
 		7F5E91BE154B378075E6F78E /* MoreHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreHubView.swift; sourceTree = "<group>"; };
 		80DF482A1FE091FDC4ADDF28 /* KyraMessageRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyraMessageRenderer.swift; sourceTree = "<group>"; };
+		81816E1AF9EF16D372AC064A /* SupabaseService+Subscriptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Subscriptions.swift"; sourceTree = "<group>"; };
 		8817ED9B69880386FF44CCF4 /* CrossedOutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossedOutApp.swift; sourceTree = "<group>"; };
 		88745AB55D413F7CE574533E /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Kyra.swift"; sourceTree = "<group>"; };
 		92844B9A5A8AE42B2D505A3D /* Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
+		9791AD109D3CAA8FD9A9AB02 /* PlusPaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlusPaywallView.swift; sourceTree = "<group>"; };
 		9A1857AC2A298FD8CD86D89D /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
 		9BF74E32355BCCC414036E57 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		9CD4C9FC4313ABC3760FEC3F /* AddToCalendarSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCalendarSheet.swift; sourceTree = "<group>"; };
 		9EFCEA8061198AC0C8C2E922 /* AddChurchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddChurchView.swift; sourceTree = "<group>"; };
 		A11868B00CFF60846A3EAC21 /* ModerationQueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationQueueView.swift; sourceTree = "<group>"; };
+		A16F51D67613210D704EE7AB /* PathPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathPickerSheet.swift; sourceTree = "<group>"; };
 		A1AB53B5882DE7D559C5A1ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Bridge.swift"; sourceTree = "<group>"; };
+		AA05B4E701CF921583B2C22E /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		AA313CE758BF252E8A734716 /* CrisisSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrisisSupportView.swift; sourceTree = "<group>"; };
 		B100027DD7B644073BE579B7 /* StreamPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPlayer.swift; sourceTree = "<group>"; };
 		B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Attend.swift"; sourceTree = "<group>"; };
@@ -114,6 +168,7 @@
 		B83FEA23A803D82902A1792A /* ChurchApplicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchApplicationView.swift; sourceTree = "<group>"; };
 		C6045EA44191338D99C53763 /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
 		C75914BB52BE2DE60E5AB396 /* IndependentStudyComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndependentStudyComposerView.swift; sourceTree = "<group>"; };
+		C98B28C98696306A44E26478 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
 		CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Devotionals.swift"; sourceTree = "<group>"; };
 		CF230FE005162BDAD6A0F57C /* ChurchFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchFinderView.swift; sourceTree = "<group>"; };
 		CFAB2A4D5858861B1DF71C45 /* BridgeComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeComposerView.swift; sourceTree = "<group>"; };
@@ -130,6 +185,8 @@
 		EA5558BACBD522E5204A0D58 /* CommunityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityView.swift; sourceTree = "<group>"; };
 		EE4842808F2C29861BB2A2A3 /* BibleReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleReaderView.swift; sourceTree = "<group>"; };
 		EEC67B2923A5BC14C0AA2998 /* AdminHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
+		F16E135733167EBC16FCF3D9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		F4D83C9CA8CD9B6CA8058B09 /* PathDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathDetailView.swift; sourceTree = "<group>"; };
 		F561C6AE240BA583BB15B21F /* GiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiveView.swift; sourceTree = "<group>"; };
 		F7ADFEC8C7333827E1855842 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		F8418F244D418C4D90CD398C /* JourneyProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyProgressView.swift; sourceTree = "<group>"; };
@@ -142,6 +199,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA5888A5F223972119647F7C /* Supabase in Frameworks */,
+				737C728F95D1B39F64EAF067 /* TelemetryDeck in Frameworks */,
+				A7396BCB84A27AA544C7D631 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -161,9 +220,19 @@
 		0BB39ACE4BCFB7A7625751F3 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				55B1EB1A42FB714AE05D8031 /* FormationBadge.swift */,
 				0A9844F06CCD645DD9C91A8D /* Models.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		1E28F4B359E8078A882A1EB1 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				4760CD9F4BA0D0FCC196FF3B /* AppSecrets.swift */,
+				4FAEF6C26A5AF2611C6AA164 /* PlusProducts.swift */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		1E385371AC3BF180367E3289 /* App */ = {
@@ -189,6 +258,8 @@
 			isa = PBXGroup;
 			children = (
 				F8418F244D418C4D90CD398C /* JourneyProgressView.swift */,
+				F4D83C9CA8CD9B6CA8058B09 /* PathDetailView.swift */,
+				A16F51D67613210D704EE7AB /* PathPickerSheet.swift */,
 			);
 			path = Progress;
 			sourceTree = "<group>";
@@ -252,11 +323,13 @@
 				D867BC82BB6EE744CBC03EB5 /* CrossedOut.entitlements */,
 				70915A1FA5552010F52A190A /* Info.plist */,
 				1E385371AC3BF180367E3289 /* App */,
+				1E28F4B359E8078A882A1EB1 /* Config */,
 				7BD06A3CFA0CC09A0A467C8B /* DesignSystem */,
 				DDE06D5753E5DC409645DACC /* Features */,
 				0BB39ACE4BCFB7A7625751F3 /* Models */,
 				224240C7F789EDA09C326AF2 /* Resources */,
 				BB97C9D4EC6DD6E5F9C3D0AF /* Services */,
+				F4CEE5A307F139E4AB709216 /* Shared */,
 			);
 			path = CrossedOut;
 			sourceTree = "<group>";
@@ -275,6 +348,7 @@
 			isa = PBXGroup;
 			children = (
 				19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */,
+				215D9A57FD56EC79B037B86C /* CrossedOutWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -292,23 +366,37 @@
 			isa = PBXGroup;
 			children = (
 				7CC6FF9CB551E643131BDC65 /* CrossedOut */,
+				C961F01AF0D4A1E43E77CC4B /* CrossedOutWidgets */,
 				90167AE502A596FE6FFCB7CE /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B54F4D0451131D1F1B795B91 /* Plus */ = {
+			isa = PBXGroup;
+			children = (
+				9791AD109D3CAA8FD9A9AB02 /* PlusPaywallView.swift */,
+			);
+			path = Plus;
 			sourceTree = "<group>";
 		};
 		BB97C9D4EC6DD6E5F9C3D0AF /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AA05B4E701CF921583B2C22E /* AnalyticsService.swift */,
 				C6045EA44191338D99C53763 /* MockData.swift */,
 				E53F83A6CA4CDB29F2BAA550 /* ReminderService.swift */,
+				C98B28C98696306A44E26478 /* SubscriptionService.swift */,
 				F7ADFEC8C7333827E1855842 /* SupabaseService.swift */,
 				72B86CF24DDF450708EDC414 /* SupabaseService+Admin.swift */,
 				B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */,
+				7B021856464D7386FB22045A /* SupabaseService+Badges.swift */,
 				A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */,
 				CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */,
+				37A84803C9A480BD18E6F4E7 /* SupabaseService+Journey.swift */,
 				898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */,
 				DBBB59E6DC0DF1358CBE1579 /* SupabaseService+Legal.swift */,
 				61B23FBED4A6F0CCA45C6844 /* SupabaseService+Micros.swift */,
+				81816E1AF9EF16D372AC064A /* SupabaseService+Subscriptions.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -322,6 +410,16 @@
 				4B7F2E8757F9A414A7FB6B59 /* PlayfairDisplay-Regular.ttf */,
 			);
 			path = Fonts;
+			sourceTree = "<group>";
+		};
+		C961F01AF0D4A1E43E77CC4B /* CrossedOutWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				4C775715827A5780ED421BBF /* CrossedOutWidgets.entitlements */,
+				04E3FB65C96831746B11C0FE /* CrossedOutWidgets.swift */,
+				F16E135733167EBC16FCF3D9 /* Info.plist */,
+			);
+			path = CrossedOutWidgets;
 			sourceTree = "<group>";
 		};
 		CB9D37F6438A2B2B6F8C0340 /* Attend */ = {
@@ -369,6 +467,7 @@
 				E5B10C1B6A043E5930894A6A /* Give */,
 				056E5C95E0F65DC938084FC1 /* Kyra */,
 				794556B9E9A6682BF74A1C63 /* Onboarding */,
+				B54F4D0451131D1F1B795B91 /* Plus */,
 				F49672597E327C252BEE0F60 /* Profile */,
 				283C40C3CCE8AF0948D049C3 /* Progress */,
 				51123DB2140C4E4F698B647B /* Today */,
@@ -409,9 +508,34 @@
 			path = Profile;
 			sourceTree = "<group>";
 		};
+		F4CEE5A307F139E4AB709216 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				27F1869D01464C15D55E9FCE /* AppGroupStore.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		46A291D45EFBB41A9C36411E /* CrossedOutWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 796B49CBA74FD3E4AFB3C2D6 /* Build configuration list for PBXNativeTarget "CrossedOutWidgets" */;
+			buildPhases = (
+				9CAE7A9C5A107159000BAAC6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CrossedOutWidgets;
+			packageProductDependencies = (
+			);
+			productName = CrossedOutWidgets;
+			productReference = 215D9A57FD56EC79B037B86C /* CrossedOutWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A4467E10A41E0D9A90C308AC /* CrossedOut */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = CABB6E04BD4374B3B9CFF9B0 /* Build configuration list for PBXNativeTarget "CrossedOut" */;
@@ -419,14 +543,18 @@
 				88F29ABBA9E82E118FD1386F /* Sources */,
 				23F7E64F472B636732ABE072 /* Resources */,
 				DFE6086E7F6F3AE71344E8B8 /* Frameworks */,
+				A287DE58856DCF7130442B25 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				E2DE608625FE75AB17419140 /* PBXTargetDependency */,
 			);
 			name = CrossedOut;
 			packageProductDependencies = (
 				98A8D907E1389379E19C011E /* Supabase */,
+				F08489E9FDE925AE3673B800 /* TelemetryDeck */,
+				C642A57E5A4AFA2EAEB02451 /* Sentry */,
 			);
 			productName = CrossedOut;
 			productReference = 19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */;
@@ -441,6 +569,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					46A291D45EFBB41A9C36411E = {
+						DevelopmentTeam = Q9ZH8AA9NY;
+						ProvisioningStyle = Automatic;
+					};
 					A4467E10A41E0D9A90C308AC = {
 						DevelopmentTeam = Q9ZH8AA9NY;
 						ProvisioningStyle = Automatic;
@@ -457,7 +589,9 @@
 			mainGroup = 9DD6129B2B3EA000E97DBAE1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				D1679E7C8155F46BB83F195E /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				930533727BDBCBA1EF20C698 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				93F12792CF22900C7B5EF4B1 /* XCRemoteSwiftPackageReference "SwiftClient" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90167AE502A596FE6FFCB7CE /* Products */;
@@ -465,6 +599,7 @@
 			projectRoot = "";
 			targets = (
 				A4467E10A41E0D9A90C308AC /* CrossedOut */,
+				46A291D45EFBB41A9C36411E /* CrossedOutWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -493,6 +628,9 @@
 				AB542AEE8EB075F15D38920C /* AddToCalendarSheet.swift in Sources */,
 				8B3C666977E9DE83DAE78611 /* AdminHubView.swift in Sources */,
 				96CA599C3851AB298AFD04DB /* AiSuggestionSheet.swift in Sources */,
+				20C5C868F10D8B13DB4EE8D1 /* AnalyticsService.swift in Sources */,
+				ABAE013FCCB8A023AE2936FC /* AppGroupStore.swift in Sources */,
+				8B088C7B9F4F51BA985CC2EE /* AppSecrets.swift in Sources */,
 				BA55322740D1D2344C1F70F3 /* AppState.swift in Sources */,
 				53CF5D584110140D5EC53180 /* AttendView.swift in Sources */,
 				B2D1CCA6263EE530DE545A98 /* AuthSheet.swift in Sources */,
@@ -512,6 +650,7 @@
 				45EBCA48F29A7A768D454731 /* DevotionalsHubView.swift in Sources */,
 				3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */,
 				83BB1E5EFFEE74E103313217 /* ExploreView.swift in Sources */,
+				F1ACFE70D3E1A560BBE620C3 /* FormationBadge.swift in Sources */,
 				D8F02082223345F0AFFDCE06 /* GiveView.swift in Sources */,
 				5FDFABA1360DCE82F2A126E8 /* Icons.swift in Sources */,
 				D3729771AE7A43E29FA6FE5D /* IndependentStudyComposerView.swift in Sources */,
@@ -526,19 +665,27 @@
 				E37A40020E3EF057E9EA74FD /* ModerationQueueView.swift in Sources */,
 				5D7136122054C197E5474FD5 /* MoreHubView.swift in Sources */,
 				D7AE2345B38CF7BAC7199185 /* OnboardingView.swift in Sources */,
+				F5CBBD838B6E03C39297A8A5 /* PathDetailView.swift in Sources */,
+				619A2CA17D28D848EFCFE417 /* PathPickerSheet.swift in Sources */,
 				7E682B2980D675865C0298A5 /* PendingVerificationView.swift in Sources */,
+				18EA29928D002EAF247977E2 /* PlusPaywallView.swift in Sources */,
+				727EAA6956745489D7A2D323 /* PlusProducts.swift in Sources */,
 				9912F6A302F8E2637C5311F1 /* ReminderService.swift in Sources */,
 				9EB5398ECA2C9B9E0A54CA36 /* RootView.swift in Sources */,
 				20AD158B3EF39060C1996845 /* ServiceDetailView.swift in Sources */,
 				82907DFD71BE5D0170527B3C /* SettingsView.swift in Sources */,
 				A5E6ADE515DD18B25AF07810 /* StreamPlayer.swift in Sources */,
+				AD73053E25FE1B6D00791F30 /* SubscriptionService.swift in Sources */,
 				2C2D824AEA0718B14BDE2F71 /* SupabaseService+Admin.swift in Sources */,
 				528FE0E6CA580B78E511B808 /* SupabaseService+Attend.swift in Sources */,
+				112B652CA281B417ADA7A879 /* SupabaseService+Badges.swift in Sources */,
 				4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */,
 				0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */,
+				3CCDB9709FC2C5B863581E71 /* SupabaseService+Journey.swift in Sources */,
 				3610EDD386C4A8DA78702FE2 /* SupabaseService+Kyra.swift in Sources */,
 				459AF94C948FC8FD56AC98C4 /* SupabaseService+Legal.swift in Sources */,
 				F35B4C061FAFBB8BC2BE69A3 /* SupabaseService+Micros.swift in Sources */,
+				195A2678B3CC38610DC063F2 /* SupabaseService+Subscriptions.swift in Sources */,
 				F82E556AE2C8E6D2E11DD008 /* SupabaseService.swift in Sources */,
 				20D200C1A012404A338C0F35 /* TabBar.swift in Sources */,
 				609D7C80470BE9C788E18390 /* Theme.swift in Sources */,
@@ -547,7 +694,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9CAE7A9C5A107159000BAAC6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C35FF1B285FF76594C3F1D10 /* AppGroupStore.swift in Sources */,
+				4C9B484BAEEEE3E52A9A29C5 /* CrossedOutWidgets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E2DE608625FE75AB17419140 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 46A291D45EFBB41A9C36411E /* CrossedOutWidgets */;
+			targetProxy = 60CBFA3CDB9A009CA5363EAF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5345B5AB3405674B63A25820 /* Release */ = {
@@ -636,6 +800,24 @@
 			};
 			name = Debug;
 		};
+		79699D7FD687292276061554 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CrossedOutWidgets/CrossedOutWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
+				INFOPLIST_FILE = CrossedOutWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tdocks.crossedout.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		AE63CF1402A41583423411DF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -658,6 +840,24 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
+		};
+		B0AB5ADDC96EE0BD663D0577 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CrossedOutWidgets/CrossedOutWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
+				INFOPLIST_FILE = CrossedOutWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tdocks.crossedout.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
 		};
 		F4306D8F5A7F67F558E4C6B1 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -718,6 +918,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		796B49CBA74FD3E4AFB3C2D6 /* Build configuration list for PBXNativeTarget "CrossedOutWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79699D7FD687292276061554 /* Debug */,
+				B0AB5ADDC96EE0BD663D0577 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		CABB6E04BD4374B3B9CFF9B0 /* Build configuration list for PBXNativeTarget "CrossedOut" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -747,6 +956,22 @@
 				minimumVersion = 2.20.0;
 			};
 		};
+		93F12792CF22900C7B5EF4B1 /* XCRemoteSwiftPackageReference "SwiftClient" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TelemetryDeck/SwiftClient";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+		D1679E7C8155F46BB83F195E /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -754,6 +979,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 930533727BDBCBA1EF20C698 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		C642A57E5A4AFA2EAEB02451 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D1679E7C8155F46BB83F195E /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
+		F08489E9FDE925AE3673B800 /* TelemetryDeck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 93F12792CF22900C7B5EF4B1 /* XCRemoteSwiftPackageReference "SwiftClient" */;
+			productName = TelemetryDeck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

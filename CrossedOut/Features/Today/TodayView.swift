@@ -17,7 +17,7 @@ struct TodayView: View {
     @State private var devotionalLoading = true
     @StateObject private var speechController = TodaySpeechController()
 
-    private enum TodayRoute: Hashable { case bible, kyra, settings, devotionals, devotionalDetail }
+    private enum TodayRoute: Hashable { case bible, kyra, settings, devotionals, devotionalDetail, journey }
 
     private static var prayedTodayKey: String {
         "co.prayedToday." + SupabaseService.dayString(Date())
@@ -40,6 +40,7 @@ struct TodayView: View {
                         offlineBanner
                     }
                     greetingBlock
+                    continuePathRow
                     dailyDevotionalRow
                     verseCard
                     focusCard
@@ -69,6 +70,8 @@ struct TodayView: View {
                         }
                     }
                     .hidesTabBar()
+                case .journey:
+                    JourneyProgressView().hidesTabBar()
                 }
             }
             .task {
@@ -90,7 +93,7 @@ struct TodayView: View {
             )) {
                 withAnimation { prayedToday = true }
                 UserDefaults.standard.set(true, forKey: TodayView.prayedTodayKey)
-                Task { await SupabaseService.shared.recordCompletion(kind: "prayer") }
+                Task { await appState.recordActivity(kind: "prayer") }
             }
             .presentationDetents([.medium])
         }
@@ -109,6 +112,21 @@ struct TodayView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: 8)
+            Button { path.append(TodayRoute.journey) } label: {
+                HStack(spacing: 4) {
+                    COIcon(.flame, size: 16, color: .coCrossRed)
+                    Text("\(appState.streak.current)")
+                        .font(.coUI(13, weight: .semibold))
+                        .foregroundColor(.coInk)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.coCard)
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(Color.coDivider, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(appState.streak.current) day streak")
             Button { path.append(TodayRoute.settings) } label: {
                 COIcon(.bell, size: 20, color: .coInkSecondary)
             }
@@ -313,7 +331,7 @@ struct TodayView: View {
             listenAction
             actionButton(.journal, "Reflect") {
                 path.append(TodayRoute.kyra)
-                Task { await SupabaseService.shared.recordCompletion(kind: "reflection") }
+                Task { await appState.recordActivity(kind: "reflection") }
             }
             prayAction
         }
@@ -325,7 +343,7 @@ struct TodayView: View {
                 speechController.stop()
             } else {
                 speechController.speak(appState.todayEntry.verse.text)
-                Task { await SupabaseService.shared.recordCompletion(kind: "scripture") }
+                Task { await appState.recordActivity(kind: "scripture") }
             }
         } label: {
             VStack(spacing: 6) {
@@ -442,7 +460,7 @@ struct TodayView: View {
                         withAnimation(.easeOut(duration: 0.35)) { actionDone = true }
                         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
                         UserDefaults.standard.set(true, forKey: TodayView.actionDoneKey)
-                        Task { await SupabaseService.shared.recordCompletion(kind: "action") }
+                        Task { await appState.recordActivity(kind: "action") }
                     } label: {
                         HStack(spacing: 8) {
                             COIcon(actionDone ? .checkCircle : .crossOut, size: 15,
@@ -470,6 +488,31 @@ struct TodayView: View {
     /// verse of the day. Tap opens the full devotional; the leading circle
     /// is the cross-off (records daily_completions kind='devotional',
     /// persisted per day). Replaces the old mid-stack card + cross-off row.
+    @ViewBuilder
+    private var continuePathRow: some View {
+        if let pathEnrollment = appState.activePath, !pathEnrollment.isComplete {
+            Button { path.append(TodayRoute.journey) } label: {
+                COCard(padding: 12) {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("CONTINUE YOUR PATH")
+                                .font(.coUI(10, weight: .semibold))
+                                .tracking(1.4)
+                                .foregroundColor(.coInkTertiary)
+                            Text("\(pathEnrollment.title) · Day \(min(pathEnrollment.currentDay, pathEnrollment.totalDays)) of \(pathEnrollment.totalDays)")
+                                .font(.coUI(14, weight: .medium))
+                                .foregroundColor(.coInk)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        COIcon(.chevronRight, size: 14, color: .coInkTertiary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var dailyDevotionalRow: some View {
         COCard(padding: 12) {
             HStack(spacing: 12) {
@@ -520,7 +563,7 @@ struct TodayView: View {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         UserDefaults.standard.set(crossedToday, forKey: TodayView.devoCrossedKey)
         if crossedToday {
-            Task { await SupabaseService.shared.recordCompletion(kind: "devotional") }
+            Task { await appState.recordActivity(kind: "devotional") }
         }
     }
 }

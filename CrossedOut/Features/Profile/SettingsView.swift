@@ -8,6 +8,9 @@ struct SettingsView: View {
     @AppStorage("co.reminder.enabled") private var reminderEnabled: Bool = false
     @AppStorage("co.reminder.hour") private var reminderHour: Int = 8
     @AppStorage("co.reminder.minute") private var reminderMinute: Int = 0
+    @AppStorage("co.streakReminder.enabled") private var streakReminderEnabled: Bool = false
+    @AppStorage("co.streakReminder.hour") private var streakReminderHour: Int = 20
+    @AppStorage("co.streakReminder.minute") private var streakReminderMinute: Int = 0
 
     @State private var firstName: String = ""
     @State private var need: String = ""
@@ -15,6 +18,8 @@ struct SettingsView: View {
     @State private var showDeleteConfirm = false
     @State private var isDeletingAccount = false
     @State private var presentedLegalDoc: LegalDoc?
+    @State private var showPlusPaywall = false
+    @ObservedObject private var subscriptions = SubscriptionService.shared
 
     private let translations = ["BSB", "WEB", "KJV"]
 
@@ -33,6 +38,7 @@ struct SettingsView: View {
                     .padding(.top, 8)
 
                 profileSection
+                subscriptionSection
                 preferencesSection
                 aboutSection
                 accountSection
@@ -45,6 +51,9 @@ struct SettingsView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: syncFromProfile)
+        .sheet(isPresented: $showPlusPaywall) {
+            PlusPaywallView()
+        }
     }
 
     private func syncFromProfile() {
@@ -126,6 +135,66 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Subscription
+
+    private var subscriptionSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionCaption("CROSSED OUT PLUS")
+
+            COCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(appState.isPlus || subscriptions.effectiveIsPlus ? "Plus is active" : "Free plan")
+                                .font(.coUI(15, weight: .semibold))
+                                .foregroundColor(.coInk)
+                            Text(
+                                appState.isPlus || subscriptions.effectiveIsPlus
+                                ? "Up to \(PlusProducts.plusKyraDailyLimit) Kyra messages / day."
+                                : "\(PlusProducts.freeKyraDailyLimit) Kyra messages / day. Upgrade for more room."
+                            )
+                            .font(.coUI(13))
+                            .foregroundColor(.coInkSecondary)
+                        }
+                        Spacer()
+                        if !(appState.isPlus || subscriptions.effectiveIsPlus) {
+                            Button("Upgrade") { showPlusPaywall = true }
+                                .font(.coUI(14, weight: .semibold))
+                                .foregroundColor(.coCrossRed)
+                        }
+                    }
+
+                    Button {
+                        Task {
+                            await subscriptions.restore()
+                            await appState.refreshPlusStatus()
+                        }
+                    } label: {
+                        Text("Restore purchases")
+                            .font(.coUI(13, weight: .medium))
+                            .foregroundColor(.coInkSecondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    #if DEBUG
+                    Toggle(isOn: Binding(
+                        get: { subscriptions.debugForcePlus },
+                        set: {
+                            subscriptions.debugForcePlus = $0
+                            appState.refreshPlusFromSubscriptions()
+                        }
+                    )) {
+                        Text("Debug: simulate Plus")
+                            .font(.coUI(13))
+                            .foregroundColor(.coInkTertiary)
+                    }
+                    .tint(.coOlive)
+                    #endif
+                }
+            }
+        }
+    }
+
     // MARK: - Preferences
 
     private var preferencesSection: some View {
@@ -139,6 +208,8 @@ struct SettingsView: View {
                     appearanceRow
                     CODivider()
                     reminderRow
+                    CODivider()
+                    streakReminderRow
                 }
             }
         }
@@ -252,6 +323,74 @@ struct SettingsView: View {
                 reminderMinute = comps.minute ?? 0
                 if reminderEnabled {
                     Task { await ReminderService.schedule(hour: reminderHour, minute: reminderMinute) }
+                }
+            }
+        )
+    }
+
+    private var streakReminderRow: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Toggle(isOn: streakReminderEnabledBinding) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Streak nudge")
+                        .font(.coUI(15))
+                        .foregroundColor(.coInk)
+                    Text("An evening reminder to keep your flame lit.")
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkTertiary)
+                }
+            }
+            .tint(.coCrossRed)
+
+            if streakReminderEnabled {
+                DatePicker("Time", selection: streakReminderTimeBinding, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: streakReminderEnabled)
+    }
+
+    private var streakReminderEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { streakReminderEnabled },
+            set: { newValue in
+                streakReminderEnabled = newValue
+                if newValue {
+                    Task {
+                        let authorized = await ReminderService.scheduleStreakNudge(
+                            hour: streakReminderHour, minute: streakReminderMinute
+                        )
+                        if !authorized {
+                            await MainActor.run { streakReminderEnabled = false }
+                        }
+                    }
+                } else {
+                    ReminderService.cancelStreakNudge()
+                }
+            }
+        )
+    }
+
+    private var streakReminderTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                var comps = DateComponents()
+                comps.hour = streakReminderHour
+                comps.minute = streakReminderMinute
+                return Calendar.current.date(from: comps) ?? Date()
+            },
+            set: { newDate in
+                let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
+                streakReminderHour = comps.hour ?? 20
+                streakReminderMinute = comps.minute ?? 0
+                if streakReminderEnabled {
+                    Task {
+                        await ReminderService.scheduleStreakNudge(
+                            hour: streakReminderHour, minute: streakReminderMinute
+                        )
+                    }
                 }
             }
         )

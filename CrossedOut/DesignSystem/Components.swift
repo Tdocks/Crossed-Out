@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Streak Day State
 
 enum StreakDayState: String, Codable, Hashable {
-    case done, grace, missed, today, future
+    case done, grace, rest, missed, today, future
 }
 
 // MARK: - Buttons
@@ -262,6 +262,9 @@ struct StreakWeekRow: View {
                 Circle().fill(Color.coOlive.opacity(0.12))
                 Circle().strokeBorder(Color.coOlive, lineWidth: 1.4)
                 COIcon(.leaf, size: 12, color: .coOlive)
+            case .rest:
+                Circle().fill(Color.coGold.opacity(0.15))
+                Circle().strokeBorder(Color.coGold, lineWidth: 1.4)
             case .today:
                 Circle().strokeBorder(Color.coCrossRed, lineWidth: 1.6)
             case .missed:

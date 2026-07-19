@@ -14,6 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const MODEL = Deno.env.get("KYRA_MODEL") ?? "gpt-5.6-luna";
 const DAILY_LIMIT = Number(Deno.env.get("KYRA_DAILY_LIMIT") ?? "30");
+const PLUS_DAILY_LIMIT = Number(Deno.env.get("KYRA_PLUS_DAILY_LIMIT") ?? "200");
 const GROUND_LIMIT = Number(Deno.env.get("KYRA_GROUND_LIMIT") ?? "5");
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
@@ -135,9 +136,18 @@ Deno.serve(async (req) => {
       return jsonError(403, "anonymous_not_allowed");
     }
 
+    // Plus members get an elevated daily cap (subscriptions / is_plus, 0036).
+    let dailyLimit = DAILY_LIMIT;
+    try {
+      const { data: plusFlag } = await supabase.rpc("is_plus");
+      if (plusFlag === true) dailyLimit = PLUS_DAILY_LIMIT;
+    } catch {
+      // Fail open to free limit — never block Kyra because entitlement check failed.
+    }
+
     const { data: allowed, error: rpcError } = await supabase.rpc(
       "increment_kyra_usage",
-      { p_limit: DAILY_LIMIT },
+      { p_limit: dailyLimit },
     );
     if (rpcError) {
       return jsonError(500, "rate_limit_check_failed");
@@ -145,6 +155,7 @@ Deno.serve(async (req) => {
     if (!allowed) {
       return jsonError(429, "daily_limit_reached", {
         message: "You've reached today's Kyra limit — come back tomorrow.",
+        plus_available: dailyLimit <= DAILY_LIMIT,
       });
     }
 

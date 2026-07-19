@@ -109,6 +109,8 @@ struct WorkingItem: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     let text: String
     var crossed: Bool
+    /// Optional focus-area slug that biases Today's verse/practice when active.
+    var focusSlug: String? = nil
 }
 
 struct StreakState: Codable, Hashable {

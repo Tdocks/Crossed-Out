@@ -142,6 +142,16 @@ enum BridgeSituation: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Prefill (Journey “invite onto path”, etc.)
+
+struct BridgeComposerPrefill: Equatable {
+    var situation: BridgeSituation? = nil
+    var forceJourneyResponse: Bool = false
+    var pathTitle: String? = nil
+    /// When set, after send we attach the bridge token to this enrollment.
+    var enrollmentId: UUID? = nil
+}
+
 // MARK: - Composer
 
 /// Three-step Bridge builder: (1) who it's for + why + personal message,
@@ -149,6 +159,7 @@ enum BridgeSituation: String, CaseIterable, Identifiable {
 /// emphasis, preview, send → shareable link. Deterministic templates by
 /// default; Kyra assist is optional, explicit, and capped.
 struct BridgeComposerView: View {
+    var prefills: BridgeComposerPrefill? = nil
     var onSent: () async -> Void = {}
 
     @EnvironmentObject private var appState: AppState
@@ -201,6 +212,22 @@ struct BridgeComposerView: View {
                 withAnimation { verseSelection = selection }
             }
             .environmentObject(appState)
+        }
+        .onAppear { applyPrefillsIfNeeded() }
+    }
+
+    private func applyPrefillsIfNeeded() {
+        guard let prefills else { return }
+        if let s = prefills.situation, situation == nil {
+            situation = s
+            whyText = s.whyTemplate
+            message = s.messageTemplate
+        }
+        if prefills.forceJourneyResponse {
+            responseOption = "journey"
+        }
+        if let pathTitle = prefills.pathTitle, invitation.isEmpty {
+            invitation = "I've started “\(pathTitle)” — walk it with me if you want. No pressure."
         }
     }
 
@@ -531,9 +558,10 @@ struct BridgeComposerView: View {
         sendFailed = false
         Task {
             do {
+                let trimmedName = toName.trimmingCharacters(in: .whitespaces)
                 let token = try await SupabaseService.shared.createBridge(
                     senderName: appState.profile.firstName,
-                    toName: toName.trimmingCharacters(in: .whitespaces),
+                    toName: trimmedName,
                     whyText: whyText.trimmingCharacters(in: .whitespacesAndNewlines),
                     message: message.trimmingCharacters(in: .whitespacesAndNewlines),
                     verseRef: v.ref,
@@ -546,8 +574,16 @@ struct BridgeComposerView: View {
                     invitation: invitation.trimmingCharacters(in: .whitespacesAndNewlines),
                     responseOption: responseOption
                 )
+                if let enrollmentId = prefills?.enrollmentId ?? appState.activePath?.id {
+                    await SupabaseService.shared.linkJourneyCompanion(
+                        enrollmentId: enrollmentId,
+                        companionName: trimmedName,
+                        bridgeToken: token
+                    )
+                }
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 withAnimation(.easeOut(duration: 0.3)) { sentToken = token }
+                await appState.recordActivity(kind: "encouragement")
                 await onSent()
             } catch {
                 sendFailed = true

@@ -26,6 +26,7 @@ struct KyraView: View {
     @State private var dailyLimitReached = false
     @State private var sendFailed = false
     @State private var showClearConfirm = false
+    @State private var showPlusPaywall = false
     /// Kyra's in-progress reply while tokens stream in. Non-nil from the
     /// first token until the stream completes (then the finished text moves
     /// into `messages`). Rendered as plain text mid-stream; the markdown
@@ -47,6 +48,9 @@ struct KyraView: View {
         .navigationBarBackButtonHidden(true)
         .hidesTabBar()
         .task { await loadHistoryIfNeeded() }
+        .sheet(isPresented: $showPlusPaywall) {
+            PlusPaywallView()
+        }
         .confirmationDialog(
             "Start a fresh conversation? Your current one will be deleted.",
             isPresented: $showClearConfirm,
@@ -271,15 +275,25 @@ struct KyraView: View {
 
     private var limitCard: some View {
         COCard {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("That's all for today.")
                     .font(.coUI(14, weight: .semibold))
                     .foregroundColor(.coInk)
-                Text("You've reached today's conversation limit with Kyra. She'll be here tomorrow. If something can't wait, reach out to a trusted friend, your church family, or a pastor.")
+                Text(
+                    appState.isPlus
+                    ? "You've reached today's Plus conversation limit with Kyra. She'll be here tomorrow. If something can't wait, reach out to a trusted friend, your church family, or a pastor."
+                    : "You've reached today's free conversation limit with Kyra. Plus gives you more room today — or she'll be here tomorrow. If something can't wait, reach out to a trusted friend, your church family, or a pastor."
+                )
                     .font(.coUI(13))
                     .foregroundColor(.coInkSecondary)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
+                if !appState.isPlus {
+                    COPrimaryButton(title: "See Crossed Out Plus") {
+                        showPlusPaywall = true
+                        AnalyticsService.shared.track("plus_paywall_from_kyra_limit")
+                    }
+                }
             }
         }
         .transition(.opacity)

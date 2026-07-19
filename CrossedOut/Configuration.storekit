@@ -1,0 +1,86 @@
+{
+  "identifier" : "A1B2C3D4",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "PLUS_GROUP",
+      "localizations" : [
+
+      ],
+      "name" : "Crossed Out Plus",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "7.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "MONTHLY001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Higher daily Kyra limits.",
+              "displayName" : "Plus Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.tdocks.crossedout.plus.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Plus Monthly",
+          "subscriptionGroupID" : "PLUS_GROUP",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "59.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "ANNUAL001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Higher daily Kyra limits — best value.",
+              "displayName" : "Plus Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.tdocks.crossedout.plus.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Plus Annual",
+          "subscriptionGroupID" : "PLUS_GROUP",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

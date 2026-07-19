@@ -1314,9 +1314,15 @@ private struct WorkingItemDTO: Codable {
     let text: String
     let crossed: Bool
     let position: Int
+    let focusSlug: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, text, crossed, position
+        case focusSlug = "focus_slug"
+    }
 
     func toModel() -> WorkingItem {
-        WorkingItem(id: id, text: text, crossed: crossed)
+        WorkingItem(id: id, text: text, crossed: crossed, focusSlug: focusSlug)
     }
 }
 
@@ -1578,16 +1584,19 @@ extension SupabaseService {
     /// Best-effort upsert of today's completion for the given kind
     /// ('scripture', 'prayer', 'reflection', 'community', 'encouragement',
     /// 'devotional'). Duplicate same-day/kind rows are ignored.
-    func recordCompletion(kind: String) async {
-        guard let uid = currentUserID else { return }
+    @discardableResult
+    func recordCompletion(kind: String) async -> [String] {
+        guard let uid = currentUserID else { return [] }
         let payload = CompletionUpsert(user_id: uid, day: Self.dayString(Date()), kind: kind)
         do {
             try await client
                 .from("daily_completions")
                 .upsert(payload, onConflict: "user_id,day,kind", ignoreDuplicates: true)
                 .execute()
+            return await awardEarnedBadges()
         } catch {
             print("SupabaseService: recordCompletion failed: \(error)")
+            return []
         }
     }
 

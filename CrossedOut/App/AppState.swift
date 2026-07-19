@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 @MainActor
 final class AppState: ObservableObject {
@@ -77,7 +78,18 @@ final class AppState: ObservableObject {
     @Published var isOffline = false
     @Published var workingItems: [WorkingItem] = MockData.streak.workingThrough
     @Published var weekRhythm: [String: Int] = [:]
-
+    /// Active multi-day Path enrollment (migration 0034). Nil = none.
+    @Published var activePath: JourneyEnrollment?
+    /// Last grace-engine result — drives “Grace held your streak” ribbon.
+    @Published var graceStatus: GraceStatus?
+    /// True after a path is finished this session — Journey shows a milestone.
+    @Published var justCompletedPathTitle: String?
+    /// Formation badges (streak fires + action marks). Catalog + earned dates.
+    @Published var badges: [FormationBadge] = FormationBadgeCatalog.all
+    /// Most recent unlock this session — Journey/Today can flash a moment.
+    @Published var newlyEarnedBadge: FormationBadge?
+    /// Crossed Out Plus entitlement (StoreKit + optional server mirror).
+    @Published var isPlus: Bool = false
     // MARK: - Persistence Keys
 
     private enum DefaultsKey {
@@ -197,19 +209,44 @@ final class AppState: ObservableObject {
 
             weekRhythm = (try? await service.fetchWeekCompletions()) ?? [:]
 
-            // Streak read-back: server values win for counters, local week view kept.
+            // Grace engine: heal a one-day gap before streak read-back.
+            if let grace = await service.applyGraceIfNeeded() {
+                graceStatus = grace
+            }
+
+            let trail = (try? await service.fetchWeekTrailMarks()) ?? []
+            let weekStates = service.buildWeekStates(from: trail)
+            let daysWithGod = weekStates.filter { $0 == .done || $0 == .grace || $0 == .rest }.count
+
+            // Streak read-back: server counters + real week trail.
             if let remote = try? await service.fetchStreak().flatMap({ $0 }) {
                 streak = StreakState(
-                    current: max(remote.current, streak.current),
+                    current: max(remote.current, graceStatus?.current ?? 0, streak.current),
                     longest: max(remote.longest, streak.longest),
-                    graceUsed: remote.graceUsed,
-                    graceTotal: remote.graceTotal,
-                    weekStates: streak.weekStates,
-                    weekWithGodDays: streak.weekWithGodDays,
-                    weekWithGodTotal: streak.weekWithGodTotal,
+                    graceUsed: graceStatus?.graceUsed ?? remote.graceUsed,
+                    graceTotal: graceStatus?.graceTotal ?? remote.graceTotal,
+                    weekStates: weekStates,
+                    weekWithGodDays: daysWithGod,
+                    weekWithGodTotal: 7,
+                    workingThrough: streak.workingThrough
+                )
+            } else if !weekStates.isEmpty {
+                streak = StreakState(
+                    current: streak.current,
+                    longest: streak.longest,
+                    graceUsed: graceStatus?.graceUsed ?? streak.graceUsed,
+                    graceTotal: graceStatus?.graceTotal ?? streak.graceTotal,
+                    weekStates: weekStates,
+                    weekWithGodDays: daysWithGod,
+                    weekWithGodTotal: 7,
                     workingThrough: streak.workingThrough
                 )
             }
+
+            activePath = try? await service.fetchActiveEnrollment()
+            await refreshBadges(award: true)
+            await refreshPlusStatus()
+            syncWidgetSnapshot()
 
             // Working items: seed once from local defaults, then read back.
             if let items = try? await service.fetchWorkingItems() {
@@ -282,7 +319,10 @@ final class AppState: ObservableObject {
     /// failure (RPC not deployed, no match, verse text lookup failure) is
     /// swallowed — never surfaces an error, never blanks the verse.
     private func applyRecommendedVerseIfAvailable(mood: String?) async {
-        let slugs = FocusAreaSlugMap.slugs(for: profile.focusAreas)
+        var slugs = FocusAreaSlugMap.slugs(for: profile.focusAreas)
+        // Active working-through focus tags bias Today (Phase D).
+        let workingSlugs = workingItems.compactMap(\.focusSlug).filter { !$0.isEmpty }
+        for s in workingSlugs where !slugs.contains(s) { slugs.append(s) }
         guard let recommended = (try? await SupabaseService.shared.recommendTodayVerse(
             focusSlugs: slugs, mood: mood, tone: nil, maturity: nil
         )) ?? nil else { return }
@@ -310,10 +350,94 @@ final class AppState: ObservableObject {
     /// step"). Stable within the day server-side; re-run after a mood
     /// check-in so a mood-matched practice can win the tiebreak.
     func refreshTodayAction(mood: String?) async {
-        let slugs = FocusAreaSlugMap.slugs(for: profile.focusAreas)
+        var slugs = FocusAreaSlugMap.slugs(for: profile.focusAreas)
+        let workingSlugs = workingItems.compactMap(\.focusSlug).filter { !$0.isEmpty }
+        for s in workingSlugs where !slugs.contains(s) { slugs.append(s) }
         todayAction = await SupabaseService.shared.fetchTodayPracticeAction(
             focusSlugs: slugs, mood: mood
         )
+    }
+
+    /// Reloads grace, week trail, streak counters, and active path.
+    func reloadJourney() async {
+        let service = SupabaseService.shared
+        if let grace = await service.applyGraceIfNeeded() {
+            graceStatus = grace
+        }
+        let trail = (try? await service.fetchWeekTrailMarks()) ?? []
+        let weekStates = service.buildWeekStates(from: trail)
+        let daysWithGod = weekStates.filter { $0 == .done || $0 == .grace || $0 == .rest }.count
+        weekRhythm = (try? await service.fetchWeekCompletions()) ?? [:]
+        if let remote = try? await service.fetchStreak().flatMap({ $0 }) {
+            streak = StreakState(
+                current: max(remote.current, graceStatus?.current ?? 0),
+                longest: remote.longest,
+                graceUsed: graceStatus?.graceUsed ?? remote.graceUsed,
+                graceTotal: graceStatus?.graceTotal ?? remote.graceTotal,
+                weekStates: weekStates,
+                weekWithGodDays: daysWithGod,
+                weekWithGodTotal: 7,
+                workingThrough: streak.workingThrough
+            )
+        }
+        activePath = try? await service.fetchActiveEnrollment()
+        if let items = try? await service.fetchWorkingItems(), !items.isEmpty {
+            workingItems = items
+        }
+        await refreshBadges(award: true)
+    }
+
+    /// Awards any newly earned badges, then refreshes the catalog merge.
+    func refreshBadges(award: Bool) async {
+        let service = SupabaseService.shared
+        var freshIDs: [String] = []
+        if award {
+            freshIDs = await service.awardEarnedBadges()
+        }
+        let earned = (try? await service.fetchEarnedBadges()) ?? [:]
+        badges = FormationBadgeCatalog.merged(earnedIDs: earned)
+        if let first = freshIDs.first,
+           let badge = badges.first(where: { $0.id == first && $0.isEarned }) {
+            newlyEarnedBadge = badge
+        }
+    }
+
+    /// Merges StoreKit + server Plus flags.
+    func refreshPlusStatus() async {
+        await SubscriptionService.shared.refreshEntitlements()
+        let local = SubscriptionService.shared.effectiveIsPlus
+        let remote = await SupabaseService.shared.fetchIsPlus()
+        isPlus = local || remote
+    }
+
+    /// Called from app launch after SubscriptionService.start().
+    func refreshPlusFromSubscriptions() {
+        isPlus = SubscriptionService.shared.effectiveIsPlus
+    }
+
+    /// Pushes today's verse + streak into the App Group for WidgetKit.
+    func syncWidgetSnapshot() {
+        let verse = todayEntry.verse
+        AppGroupStore.writeSnapshot(
+            AppGroupStore.VerseSnapshot(
+                ref: verse.ref.display,
+                text: verse.text,
+                streakCurrent: streak.current,
+                updatedAt: Date()
+            )
+        )
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func useGraceDay() async -> Bool {
+        do {
+            let status = try await SupabaseService.shared.useGraceDay()
+            graceStatus = status
+            await reloadJourney()
+            return status.applied
+        } catch {
+            return false
+        }
     }
 
     /// Refreshes the community feed. Used by pull-to-refresh, after
@@ -436,7 +560,14 @@ final class AppState: ObservableObject {
             await SupabaseService.shared.saveCheckIn(mood: mood.rawValue, note: nil)
             await SupabaseService.shared.touchStreak()
             await SupabaseService.shared.recordCompletion(kind: "scripture")
+            await refreshBadges(award: true)
         }
+    }
+
+    /// Records a rhythm completion and refreshes badge unlocks.
+    func recordActivity(kind: String) async {
+        await SupabaseService.shared.recordCompletion(kind: kind)
+        await refreshBadges(award: true)
     }
 
     /// Bumps the streak locally the first time the user checks in on a given
@@ -462,6 +593,7 @@ final class AppState: ObservableObject {
             weekWithGodTotal: streak.weekWithGodTotal,
             workingThrough: streak.workingThrough
         )
+        syncWidgetSnapshot()
     }
 
     // MARK: - Onboarding

@@ -8,15 +8,28 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: 2.20.0
+  TelemetryDeck:
+    url: https://github.com/TelemetryDeck/SwiftClient
+    from: 2.0.0
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 8.0.0
 targets:
   CrossedOut:
     type: application
     platform: iOS
     sources:
-      - CrossedOut
+      - path: CrossedOut
+        excludes:
+          - "**/*.storekit"
     dependencies:
       - package: Supabase
         product: Supabase
+      - package: TelemetryDeck
+        product: TelemetryDeck
+      - package: Sentry
+        product: Sentry
+      - target: CrossedOutWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tdocks.crossedout
@@ -43,3 +56,36 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         CFBundleDisplayName: Crossed Out
         NSCalendarsWriteOnlyAccessUsageDescription: "Crossed Out can add a calendar event when you plan a church visit."
+  CrossedOutWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - CrossedOutWidgets
+      - path: CrossedOut/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tdocks.crossedout.widgets
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: Q9ZH8AA9NY
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: CrossedOutWidgets/CrossedOutWidgets.entitlements
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+    info:
+      path: CrossedOutWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Crossed Out
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+schemes:
+  CrossedOut:
+    build:
+      targets:
+        CrossedOut: all
+        CrossedOutWidgets: all
+    run:
+      config: Debug
+      storeKitConfiguration: CrossedOut/Configuration.storekit
