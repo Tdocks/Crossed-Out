@@ -7,7 +7,7 @@ import Supabase
 /// `<baseURL>?bridge=<token>`. Same hosting as the church portal
 /// (see PortalConfig / RBAC_AND_PORTAL_RUNBOOK.md).
 enum BridgeConfig {
-    static let baseURL = "https://crossedout-church-portal.pages.dev/bridge.html"
+    static let baseURL = "https://crossedout-church-portal.vercel.app/bridge.html"
 
     static func link(token: String) -> String {
         "\(baseURL)?bridge=\(token)"

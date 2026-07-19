@@ -62,6 +62,84 @@ enum BridgeSituation: String, CaseIterable, Identifiable {
             return "For what it's worth — nobody checks your ID at the door, and you can sit in the back with me. Zero pressure. I just didn't want awkwardness to be the only reason you never got to see it."
         }
     }
+
+    /// Seed text shown in the verse picker search field.
+    var verseSearchSeed: String { rawValue }
+
+    /// Semantic query tuned for pastoral tone (welcome/comfort, not fear).
+    var semanticSearchQuery: String {
+        switch self {
+        case .grief:
+            return "comfort for someone grieving a loss; God near the brokenhearted; hope that does not minimize pain"
+        case .breakup:
+            return "healing after heartbreak; God's nearness when a relationship ends; peace and new mercies"
+        case .stress:
+            return "rest for the weary and anxious; cast your cares; peace that guards the heart under pressure"
+        case .curiosity:
+            return "gentle invitation to know God; seek and you will find; kindness that leads toward faith"
+        case .loneliness:
+            return "God's presence in loneliness; you are not forsaken; belonging and companionship"
+        case .hurtByChurch:
+            return "healing after church hurt or religious harm; Jesus gentle and lowly; rest for the wounded, not defense of hypocrisy"
+        case .nervousAboutChurch:
+            return "gentle welcome and belonging for someone nervous or intimidated about visiting church; God's kindness and open door, not fear or judgment"
+        }
+    }
+
+    /// Hand-picked starter refs resolved from the live BSB corpus in the picker.
+    var curatedVerseRefs: [(book: String, chapter: Int, verse: Int)] {
+        switch self {
+        case .grief:
+            return [
+                ("Psalms", 34, 18),
+                ("Matthew", 5, 4),
+                ("Revelation", 21, 4),
+                ("2 Corinthians", 1, 3)
+            ]
+        case .breakup:
+            return [
+                ("Psalms", 147, 3),
+                ("Isaiah", 41, 10),
+                ("Psalms", 30, 5),
+                ("Romans", 8, 38)
+            ]
+        case .stress:
+            return [
+                ("Matthew", 11, 28),
+                ("Philippians", 4, 6),
+                ("1 Peter", 5, 7),
+                ("Psalms", 46, 1)
+            ]
+        case .curiosity:
+            return [
+                ("Matthew", 7, 7),
+                ("Jeremiah", 29, 13),
+                ("John", 1, 39),
+                ("Acts", 17, 27)
+            ]
+        case .loneliness:
+            return [
+                ("Deuteronomy", 31, 6),
+                ("Psalms", 23, 4),
+                ("Isaiah", 43, 2),
+                ("Hebrews", 13, 5)
+            ]
+        case .hurtByChurch:
+            return [
+                ("Matthew", 11, 28),
+                ("Matthew", 23, 4),
+                ("Psalms", 34, 18),
+                ("John", 8, 7)
+            ]
+        case .nervousAboutChurch:
+            return [
+                ("Romans", 15, 7),
+                ("Matthew", 11, 28),
+                ("Hebrews", 10, 24),
+                ("John", 14, 27)
+            ]
+        }
+    }
 }
 
 // MARK: - Composer
@@ -119,9 +197,10 @@ struct BridgeComposerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .hidesTabBar()
         .sheet(isPresented: $showVersePicker) {
-            BridgeVersePicker { selection in
+            BridgeVersePicker(situation: situation) { selection in
                 withAnimation { verseSelection = selection }
             }
+            .environmentObject(appState)
         }
     }
 

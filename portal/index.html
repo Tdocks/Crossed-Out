@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Crossed Out — Church Portal</title>
+<style>
+  :root{
+    --paper:#F6F1E7; --card:#FFFDF8; --ink:#2B2621; --ink2:#6B6459; --ink3:#9A9184;
+    --red:#B23A31; --olive:#5E6B47; --gold:#C8A24B; --divider:#E4DCCB;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:520px;margin:0 auto;padding:32px 22px 64px}
+  .brand{font-size:22px;font-weight:700;letter-spacing:.02em;text-align:center;margin-bottom:4px}
+  .brand .x{color:var(--red)}
+  .tag{text-align:center;color:var(--ink2);font-size:13px;margin-bottom:28px}
+  h1{font-size:24px;margin:0 0 6px}
+  h2{font-size:12px;letter-spacing:.12em;color:var(--ink3);text-transform:uppercase;margin:26px 0 10px}
+  p.sub{color:var(--ink2);font-size:14px;margin:0 0 18px}
+  label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:14px 0 5px}
+  input{width:100%;padding:13px 14px;font-size:15px;color:var(--ink);background:var(--card);
+    border:1px solid var(--divider);border-radius:12px;outline:none}
+  input:focus{border-color:var(--gold)}
+  button{width:100%;padding:14px;font-size:15px;font-weight:600;color:#fff;background:var(--ink);
+    border:none;border-radius:12px;cursor:pointer;margin-top:18px}
+  button.alt{background:transparent;color:var(--ink);border:1px solid var(--divider)}
+  button:disabled{opacity:.5;cursor:default}
+  .card{background:var(--card);border:1px solid var(--divider);border-radius:16px;padding:18px;margin-bottom:14px}
+  .msg{font-size:13px;padding:12px 14px;border-radius:10px;margin-top:14px}
+  .msg.err{background:#F7E4E1;color:var(--red)}
+  .msg.ok{background:#E8EDE0;color:var(--olive)}
+  .pill{display:inline-block;font-size:11px;padding:4px 10px;border-radius:999px;background:#EFE9DB;color:var(--ink2)}
+  .row{display:flex;gap:10px}
+  .row button{margin-top:0}
+  .link{display:block;text-align:center;color:var(--ink2);font-size:13px;margin-top:16px;cursor:pointer;text-decoration:underline}
+  .hidden{display:none}
+  .tokenbox{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;
+    background:var(--paper);border:1px solid var(--divider);border-radius:10px;padding:12px;margin-top:12px}
+  .muted{color:var(--ink3);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Crossed <span class="x">Out</span></div>
+  <div class="tag">Church Portal</div>
+  <div id="app"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://wqumwxoiqsiwizlftojq.supabase.co";
+const SUPABASE_KEY = "sb_publishable_W6kfGB2XfRAYvV_kfe_tWA_NiAdhZmL";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const app = document.getElementById("app");
+const params = new URLSearchParams(location.search);
+const inviteToken = params.get("invite");
+
+const esc = (s)=> (s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function msg(el, text, kind){ el.innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; }
+
+// ---------------------------------------------------------------- Router
+(async function init(){
+  if (inviteToken) return renderInvite();
+  return renderAdmin();
+})();
+
+// ---------------------------------------------------------------- Invite signup
+async function renderInvite(){
+  app.innerHTML = `<p class="sub">Checking your invitation…</p>`;
+  let res;
+  try { res = (await sb.rpc("validate_church_invite", { p_token: inviteToken })).data; }
+  catch(e){ res = null; }
+
+  if (!res || !res.valid){
+    const reason = res && res.reason === "used" ? "This invitation has already been used."
+      : res && res.reason === "expired" ? "This invitation has expired."
+      : "We couldn't find that invitation.";
+    app.innerHTML = `<h1>Invitation unavailable</h1><p class="sub">${esc(reason)} Please ask for a fresh link.</p>`;
+    return;
+  }
+
+  const prefillName = res.church_name || "";
+  const prefillEmail = res.contact_email || "";
+  app.innerHTML = `
+    <h1>Welcome${prefillName ? ", " + esc(prefillName) : ""}.</h1>
+    <p class="sub">You've been invited to add your church to Crossed Out. Create your account and church profile below — you'll be approved automatically.</p>
+    <div class="card">
+      <label>Your email</label>
+      <input id="email" type="email" value="${esc(prefillEmail)}" placeholder="you@church.org" />
+      <label>Password</label>
+      <input id="password" type="password" placeholder="At least 6 characters" />
+      <label>Your name</label>
+      <input id="contact" type="text" placeholder="Contact person" />
+      <label>Church name</label>
+      <input id="church" type="text" value="${esc(prefillName)}" placeholder="e.g. Grace Chapel" />
+      <label>City</label>
+      <input id="city" type="text" placeholder="e.g. Austin, TX" />
+      <label>Denomination (optional)</label>
+      <input id="denom" type="text" placeholder="e.g. Non-denominational" />
+      <label>YouTube channel (optional)</label>
+      <input id="yt" type="text" placeholder="@handle or channel URL" />
+      <label>Website (optional)</label>
+      <input id="web" type="text" placeholder="https://…" />
+      <button id="go">Create church account</button>
+      <div id="out"></div>
+      <div class="link" id="haveacct">Already confirmed your email? Sign in to finish</div>
+    </div>`;
+
+  document.getElementById("go").onclick = submitInvite;
+  document.getElementById("haveacct").onclick = ()=>signInThenRedeem();
+}
+
+function inviteFields(){
+  return {
+    p_token: inviteToken,
+    p_contact_name: val("contact"),
+    p_church_name: val("church"),
+    p_city: val("city"),
+    p_denomination: val("denom") || null,
+    p_style: null,
+    p_youtube_handle: val("yt") || null,
+    p_website_url: val("web") || null,
+    p_contact_email: val("email") || null
+  };
+}
+const val = (id)=> (document.getElementById(id)?.value || "").trim();
+
+async function submitInvite(){
+  const out = document.getElementById("out");
+  const btn = document.getElementById("go");
+  msg(out,"","");
+  if (!val("church") || !val("city")){ return msg(out,"Church name and city are required.","err"); }
+  if (val("password").length < 6){ return msg(out,"Password must be at least 6 characters.","err"); }
+  btn.disabled = true; btn.textContent = "Creating…";
+  try {
+    const { data, error } = await sb.auth.signUp({ email: val("email"), password: val("password") });
+    if (error) throw error;
+    if (data.session){
+      await redeem(out);
+    } else {
+      // Email confirmation is required by the project — no session yet.
+      msg(out,"Almost done — check your email to confirm your address, then come back to this same link and choose “Sign in to finish”.","ok");
+      btn.disabled = false; btn.textContent = "Create church account";
+    }
+  } catch(e){
+    const m = /already registered/i.test(e.message||"") ? "That email already has an account. Choose “Sign in to finish” below."
+      : "We couldn't create the account. Please try again.";
+    msg(out, m, "err");
+    btn.disabled = false; btn.textContent = "Create church account";
+  }
+}
+
+async function signInThenRedeem(){
+  const out = document.getElementById("out");
+  msg(out,"","");
+  if (val("password").length < 6){ return msg(out,"Enter your email and password above, then tap this again.","err"); }
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email: val("email"), password: val("password") });
+    if (error) throw error;
+    await redeem(out);
+  } catch(e){
+    msg(out,"That email and password didn't match. Try again.","err");
+  }
+}
+
+async function redeem(out){
+  try {
+    const { error } = await sb.rpc("redeem_church_invite", inviteFields());
+    if (error) throw error;
+    app.innerHTML = `<h1>You're all set 🎉</h1>
+      <p class="sub">Your church is live in Crossed Out. Open the app, sign in with the account you just created, and tap <b>More → Manage My Church</b> anytime to update your details or streaming link.</p>`;
+  } catch(e){
+    const m = /already used/i.test(e.message||"") ? "This invitation was already redeemed."
+      : "We couldn't finish setting up your church. Please try again.";
+    msg(out, m, "err");
+  }
+}
+
+// ---------------------------------------------------------------- Admin console
+async function renderAdmin(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) return renderAdminLogin();
+  return renderAdminHome();
+}
+
+function renderAdminLogin(){
+  app.innerHTML = `
+    <h1>Admin sign in</h1>
+    <p class="sub">Sign in with your system-admin account to invite churches and review pending ones.</p>
+    <div class="card">
+      <label>Email</label><input id="aemail" type="email" />
+      <label>Password</label><input id="apass" type="password" />
+      <button id="alogin">Sign in</button>
+      <div id="aout"></div>
+    </div>`;
+  document.getElementById("alogin").onclick = async ()=>{
+    const out = document.getElementById("aout");
+    msg(out,"","");
+    try {
+      const { error } = await sb.auth.signInWithPassword({
+        email: document.getElementById("aemail").value.trim(),
+        password: document.getElementById("apass").value
+      });
+      if (error) throw error;
+      renderAdminHome();
+    } catch(e){ msg(out,"Sign in failed. Check your credentials.","err"); }
+  };
+}
+
+async function renderAdminHome(){
+  app.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h1 style="margin:0">Admin</h1>
+      <span class="link" id="signout" style="margin:0">Sign out</span>
+    </div>
+    <h2>Invite a church</h2>
+    <div class="card">
+      <label>Church name (optional)</label><input id="icname" type="text" placeholder="Pre-fills their form" />
+      <label>Their email (optional)</label><input id="iemail" type="email" placeholder="For your records" />
+      <button id="mint">Generate invite link</button>
+      <div id="mintout"></div>
+    </div>
+    <h2>Pending churches</h2>
+    <div id="pending"><p class="muted">Loading…</p></div>`;
+
+  document.getElementById("signout").onclick = async ()=>{ await sb.auth.signOut(); renderAdminLogin(); };
+  document.getElementById("mint").onclick = mintInvite;
+  loadPending();
+}
+
+async function mintInvite(){
+  const out = document.getElementById("mintout");
+  msg(out,"","");
+  try {
+    const { data, error } = await sb.rpc("create_church_invite", {
+      p_church_name: document.getElementById("icname").value.trim() || null,
+      p_contact_email: document.getElementById("iemail").value.trim() || null,
+      p_expires_days: 30
+    });
+    if (error) throw error;
+    const link = `${location.origin}${location.pathname}?invite=${data}`;
+    out.innerHTML = `<div class="msg ok">Invite link ready — send it to the church rep.</div>
+      <div class="tokenbox" id="lk">${esc(link)}</div>
+      <div class="row"><button class="alt" id="copy">Copy link</button></div>`;
+    document.getElementById("copy").onclick = ()=>{ navigator.clipboard.writeText(link); document.getElementById("copy").textContent="Copied ✓"; };
+  } catch(e){ msg(out,"Couldn't generate a link. Are you signed in as a system admin?","err"); }
+}
+
+async function loadPending(){
+  const wrap = document.getElementById("pending");
+  let rows;
+  try { rows = (await sb.rpc("admin_list_pending_churches")).data || []; }
+  catch(e){ wrap.innerHTML = `<p class="muted">Couldn't load pending churches.</p>`; return; }
+  if (!rows.length){ wrap.innerHTML = `<p class="muted">No churches waiting for review.</p>`; return; }
+  wrap.innerHTML = rows.map(r=>`
+    <div class="card" data-uid="${esc(r.user_id)}">
+      <div style="font-weight:600;font-size:16px">${esc(r.church_name||"Unnamed church")}</div>
+      <div class="muted">${esc(r.city||"")}</div>
+      ${r.contact_email?`<div class="muted">${esc(r.contact_email)}</div>`:""}
+      ${r.youtube_handle?`<div class="muted">YouTube: ${esc(r.youtube_handle)}</div>`:""}
+      <div class="row" style="margin-top:12px">
+        <button class="verify" style="background:var(--olive)">Verify</button>
+        <button class="reject alt" style="color:var(--red);border-color:var(--red)">Reject</button>
+      </div>
+      <div class="out"></div>
+    </div>`).join("");
+  wrap.querySelectorAll(".card").forEach(card=>{
+    const uid = card.getAttribute("data-uid");
+    card.querySelector(".verify").onclick = ()=>act(uid,true,card);
+    card.querySelector(".reject").onclick = ()=>act(uid,false,card);
+  });
+}
+
+async function act(uid, approve, card){
+  const out = card.querySelector(".out");
+  try {
+    const fn = approve ? "admin_verify_church_account" : "admin_reject_church_account";
+    const { error } = await sb.rpc(fn, { p_user_id: uid });
+    if (error) throw error;
+    card.style.opacity = .5;
+    out.innerHTML = `<div class="msg ok">${approve?"Verified — church is live.":"Rejected."}</div>`;
+    setTimeout(loadPending, 800);
+  } catch(e){ out.innerHTML = `<div class="msg err">That action didn't go through.</div>`; }
+}
+</script>
+</body>
+</html>

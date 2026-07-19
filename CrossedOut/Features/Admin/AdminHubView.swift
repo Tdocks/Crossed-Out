@@ -4,7 +4,7 @@ import SwiftUI
 /// portal (church-portal.html) is hosted. The `?invite=<token>` query is
 /// appended to it. See RBAC_AND_PORTAL_RUNBOOK.md.
 enum PortalConfig {
-    static let baseURL = "https://crossedout-church-portal.pages.dev"
+    static let baseURL = "https://crossedout-church-portal.vercel.app"
 }
 
 /// System-admin console (Tyler). Two jobs: verify churches that self-signed

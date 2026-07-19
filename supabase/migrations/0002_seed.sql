@@ -35,8 +35,6 @@ insert into public.give_projects (title, org, raised, goal, date_range) values
 ('Feed the Homeless','Charlotte, NC',4820,10000,null),
 ('Mission Trip to Kenya','Jul 12 – Jul 24',3150,5000,'Jul 12 – Jul 24');
 
-insert into public.prayer_requests (author_name, body, prayed_count) values
-('Jessica L.','Please pray for my dad''s surgery on Friday. Thank you!',12);
-
-insert into public.community_posts (author_name, kind, body, verse_ref, verse_text, heart_count) values
-('Mark D.','verse_share','','John 16:33','I have told you these things, so that in me you may have peace. In this world you will have trouble. But take heart! I have overcome the world.',18);
+-- Community is intentionally not seeded with demo users. Real prayer
+-- requests and posts come from signed-in accounts. Migration 0033 also
+-- deletes any Jessica L. / Mark D. rows left from older installs.

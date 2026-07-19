@@ -440,6 +440,35 @@ extension SupabaseService {
         return BibleChapter(book: book, chapter: chapter, translation: translation, heading: "", verses: verses)
     }
 
+    /// Fetches a single verse from `bible_verses` by exact reference.
+    /// Used by Bridge curated starters so suggestions are always live text.
+    func fetchBibleVerse(
+        book: String, chapter: Int, verse: Int, translation: String
+    ) async throws -> BibleSearchResult {
+        struct Row: Decodable {
+            let book: String
+            let chapter: Int
+            let verse: Int
+            let text: String
+        }
+        let rows: [Row] = try await client
+            .from("bible_verses")
+            .select("book,chapter,verse,text")
+            .eq("translation", value: translation)
+            .eq("book", value: book)
+            .eq("chapter", value: chapter)
+            .eq("verse", value: verse)
+            .limit(1)
+            .execute()
+            .value
+        guard let row = rows.first else {
+            throw KyraServiceError.missingText
+        }
+        return BibleSearchResult(
+            book: row.book, chapter: row.chapter, verse: row.verse, text: row.text
+        )
+    }
+
     /// Full-text searches Scripture via the `search_bible` RPC (migration
     /// 0011) within a single translation. Returns an empty array for
     /// blank/whitespace-only queries without hitting the network. Still

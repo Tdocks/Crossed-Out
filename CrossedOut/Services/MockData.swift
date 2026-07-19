@@ -110,23 +110,8 @@ enum MockData {
     }
 
     // MARK: - Community
-
-    static let prayerRequests: [PrayerRequest] = [
-        PrayerRequest(authorName: "Jessica L.", timeAgo: "2h ago",
-                      text: "Please pray for my dad's surgery on Friday. Thank you!",
-                      prayedCount: 12)
-    ]
-
-    static let communityPosts: [CommunityPost] = [
-        CommunityPost(authorName: "Jessica L.", timeAgo: "2h ago", kind: .prayer,
-                      text: "Please pray for my dad's surgery on Friday. Thank you!",
-                      heartCount: 12),
-        CommunityPost(authorName: "Mark D.", timeAgo: "5h ago", kind: .verseShare,
-                      text: "This got me through today.",
-                      verseRef: "John 16:33",
-                      verseText: "I have told you these things so that in Me you may have peace. In the world you will have tribulation. But take courage; I have overcome the world!",
-                      heartCount: 18)
-    ]
+    // Intentionally empty — Community never falls back to mock feed content.
+    // (See AppState.reloadCommunity; DB cleanup in 0033_remove_community_seed_mocks.)
 
     // MARK: - Attend
 

@@ -15,6 +15,7 @@ struct BridgeShareView: View {
     @State private var bridges: [SentBridge] = []
     @State private var loading = true
     @State private var loadFailed = false
+    @State private var showComposer = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -24,14 +25,9 @@ struct BridgeShareView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
                     bridgeVisual
-                    NavigationLink {
-                        BridgeComposerView { await reload() }
-                            .environmentObject(appState)
-                    } label: {
-                        COPrimaryButton(title: "Build a Bridge") {}
-                            .allowsHitTesting(false)
+                    COPrimaryButton(title: "Build a Bridge") {
+                        showComposer = true
                     }
-                    .buttonStyle(.plain)
                     yourBridgesSection
                 }
                 .padding(.horizontal, 22)
@@ -43,6 +39,10 @@ struct BridgeShareView: View {
             if isModal {
                 dismissButton
             }
+        }
+        .navigationDestination(isPresented: $showComposer) {
+            BridgeComposerView { await reload() }
+                .environmentObject(appState)
         }
         .task { await reload() }
     }
