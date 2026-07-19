@@ -66,9 +66,31 @@ struct PlusPaywallView: View {
         }
     }
 
+    /// True only when launched via the CO_SCREEN=plus debug route (used for
+    /// capturing App Store review screenshots). Never true in a normal build.
+    private var isReviewCapture: Bool {
+        ProcessInfo.processInfo.environment["CO_SCREEN"] == "plus"
+    }
+
+    private func staticPlan(_ name: String, _ price: String) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name).font(.coUI(16, weight: .semibold)).foregroundColor(.white)
+                Text(price).font(.coUI(13)).foregroundColor(.white.opacity(0.85))
+            }
+            Spacer()
+        }
+        .padding(16)
+        .background(Color.coCrossRed)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
     private var plans: some View {
         VStack(spacing: 12) {
-            if subs.products.isEmpty {
+            if isReviewCapture {
+                staticPlan("Crossed Out Plus (Monthly)", "$7.99 / month")
+                staticPlan("Crossed Out Plus (Annual)", "$59.99 / year")
+            } else if subs.products.isEmpty {
                 COCard {
                     Text("Plans load from the App Store. If you're testing locally, use the included StoreKit config file — or turn on Debug → Simulate Plus in Settings.")
                         .font(.coUI(13))
