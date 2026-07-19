@@ -37,6 +37,8 @@ struct AttendView: View {
                             .foregroundColor(.coInk)
                             .padding(.top, 8)
 
+                        findChurchCard
+
                         if appState.attendLoading {
                             loadingState
                         } else if appState.attendLoadFailed {
@@ -99,6 +101,36 @@ struct AttendView: View {
             actionTitle: "Try Again",
             action: { Task { await appState.retryAttend() } }
         )
+    }
+
+    // MARK: Find a church near you
+
+    private var findChurchCard: some View {
+        NavigationLink {
+            ChurchFinderView()
+        } label: {
+            COCard {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.coCrossRed.opacity(0.12))
+                        COIcon(.mapPin, size: 18, color: .coCrossRed)
+                    }
+                    .frame(width: 40, height: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Find a church near you")
+                            .font(.coUI(15, weight: .semibold))
+                            .foregroundColor(.coInk)
+                        Text("Discover churches to visit in person")
+                            .font(.coUI(12))
+                            .foregroundColor(.coInkSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    COIcon(.chevronRight, size: 16, color: .coInkTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Live Now

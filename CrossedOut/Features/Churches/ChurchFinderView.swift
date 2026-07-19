@@ -70,6 +70,7 @@ struct ChurchFinderView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .hidesTabBar()
         .sheet(item: $detailChurch) { church in
             FoundChurchDetailSheet(church: church, streamingMatch: matchedStreaming(church))
                 .presentationDetents([.medium, .large])
