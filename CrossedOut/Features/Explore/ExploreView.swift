@@ -3,10 +3,10 @@ import UIKit
 
 // MARK: - Explore
 //
-// Discovery surface backed by explore_items (migration 0037). Content is
-// ingested server-side by the explore_* edge functions and read read-only
-// here; tapping any item hands the user OUT to the source app via its
-// universal link. No third-party media is played or reproduced in-app.
+// Discovery surface backed by explore_items (migration 0037). Single-select
+// TABS: exactly one vertical is shown at a time (Sermons default). Tapping an
+// item hands the user OUT to the source app via its universal link. No
+// third-party media is played or reproduced in-app.
 
 struct ExploreView: View {
     @Environment(\.openURL) private var openURL
@@ -15,7 +15,11 @@ struct ExploreView: View {
     @State private var isLoading = true
     @State private var loadFailed = false
     @State private var searchText: String = ""
-    @State private var selectedVerticals: Set<ExploreVertical> = []
+    @State private var selectedVertical: ExploreVertical = .sermons
+
+    private var orderedVerticals: [ExploreVertical] {
+        ExploreVertical.allCases.sorted { $0.order < $1.order }
+    }
 
     var body: some View {
         ZStack {
@@ -39,15 +43,20 @@ struct ExploreView: View {
             )
             .padding(.horizontal, 20)
         } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+            VStack(spacing: 0) {
+                VStack(spacing: 14) {
                     searchField
-                    chipRow
-                    feed
+                    tabBar
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 90)
+                .padding(.bottom, 14)
+
+                ScrollView {
+                    tabContent
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 90)
+                }
             }
         }
     }
@@ -57,14 +66,12 @@ struct ExploreView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             COIcon(.search, size: 17, color: .coInkTertiary)
-            TextField("Search Explore", text: $searchText)
+            TextField("Search \(selectedVertical.chipTitle.lowercased())", text: $searchText)
                 .font(.coUI(15))
                 .foregroundColor(.coInk)
                 .autocorrectionDisabled()
             if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
+                Button { searchText = "" } label: {
                     COIcon(.crossOut, size: 15, color: .coInkTertiary)
                 }
                 .buttonStyle(.plain)
@@ -80,136 +87,73 @@ struct ExploreView: View {
         )
     }
 
-    // MARK: Chips
+    // MARK: Tab bar (single-select)
 
-    private var chipRow: some View {
+    private var tabBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
-                ForEach(ExploreVertical.allCases.sorted { $0.order < $1.order }) { vertical in
-                    COChip(
-                        text: vertical.chipTitle,
-                        selected: selectedVerticals.contains(vertical)
-                    ) {
-                        toggle(vertical)
+                ForEach(orderedVerticals) { vertical in
+                    COChip(text: vertical.chipTitle, selected: selectedVertical == vertical) {
+                        guard selectedVertical != vertical else { return }
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        withAnimation(.easeInOut(duration: 0.15)) { selectedVertical = vertical }
                     }
                 }
             }
+            .padding(.vertical, 1)
         }
     }
 
-    private func toggle(_ vertical: ExploreVertical) {
-        if selectedVerticals.contains(vertical) {
-            selectedVerticals.remove(vertical)
-        } else {
-            selectedVerticals.insert(vertical)
-        }
-    }
-
-    // MARK: Feed
-
-    private enum FeedRow: Identifiable {
-        case data(Section)
-        case comingSoon(ExploreVertical)
-        var id: String {
-            switch self {
-            case .data(let s): return "data-\(s.vertical.rawValue)"
-            case .comingSoon(let v): return "soon-\(v.rawValue)"
-            }
-        }
-    }
+    // MARK: Active tab content
 
     @ViewBuilder
-    private var feed: some View {
-        let rows = feedRows()
-        if rows.isEmpty {
-            COEmptyState(
-                icon: searchText.isEmpty ? .study : .search,
-                title: searchText.isEmpty ? "Nothing here yet" : "No matches",
-                message: searchText.isEmpty
-                    ? "Fresh worship, sermons, and devotionals are on the way. Check back soon."
-                    : "Try a different search or clear your filters."
-            )
-            .padding(.top, 20)
-        } else {
-            ForEach(rows) { row in
-                switch row {
-                case .data(let section): dataSection(section)
-                case .comingSoon(let vertical): comingSoonSection(vertical)
-                }
+    private var tabContent: some View {
+        if selectedVertical.isComingSoon {
+            VStack(alignment: .leading, spacing: 14) {
+                ComingSoonCard(icon: selectedVertical.icon, message: selectedVertical.comingSoonMessage)
             }
-        }
-    }
-
-    @ViewBuilder
-    private func dataSection(_ section: Section) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            COSectionHeader(title: section.vertical.sectionTitle)
-            if section.vertical == .devotionals {
+            .padding(.top, 8)
+        } else {
+            let matches = filteredItems(for: selectedVertical)
+            if matches.isEmpty {
+                COEmptyState(
+                    icon: searchText.isEmpty ? .study : .search,
+                    title: searchText.isEmpty ? "Nothing here yet" : "No matches",
+                    message: searchText.isEmpty
+                        ? "Fresh \(selectedVertical.chipTitle.lowercased()) is on the way. Check back soon."
+                        : "Try a different search or clear it."
+                )
+                .padding(.top, 28)
+            } else if selectedVertical == .devotionals {
                 VStack(spacing: 12) {
-                    ForEach(section.items) { item in
+                    ForEach(matches) { item in
                         DevotionalRow(item: item) { open(item) }
                     }
                 }
+                .padding(.top, 4)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(section.items) { item in
-                            ExplorePosterCard(item: item) { open(item) }
-                        }
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)],
+                    spacing: 20
+                ) {
+                    ForEach(matches) { item in
+                        ExplorePosterCard(item: item) { open(item) }
                     }
                 }
+                .padding(.top, 4)
             }
         }
     }
 
-    private func comingSoonSection(_ vertical: ExploreVertical) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            COSectionHeader(title: vertical.sectionTitle)
-            ComingSoonCard(icon: vertical.icon, message: vertical.comingSoonMessage)
-        }
-    }
-
-    private func feedRows() -> [FeedRow] {
-        let grouped = filteredGrouped()
-        let dataByVertical = Dictionary(uniqueKeysWithValues: grouped.map { ($0.vertical, $0) })
-        let searching = !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let verticals = selectedVerticals.isEmpty
-            ? Set(ExploreVertical.allCases) : selectedVerticals
-
-        var rows: [FeedRow] = []
-        for vertical in ExploreVertical.allCases.sorted(by: { $0.order < $1.order }) {
-            guard verticals.contains(vertical) else { continue }
-            if let section = dataByVertical[vertical] {
-                rows.append(.data(section))
-            } else if vertical.isComingSoon && !searching {
-                rows.append(.comingSoon(vertical))
-            }
-        }
-        return rows
-    }
-
-    // MARK: Filtering
-
-    private struct Section { let vertical: ExploreVertical; let items: [ExploreItem] }
-
-    private func filteredGrouped() -> [Section] {
+    private func filteredItems(for vertical: ExploreVertical) -> [ExploreItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let verticals = selectedVerticals.isEmpty
-            ? Set(ExploreVertical.allCases) : selectedVerticals
-
-        var sections: [Section] = []
-        for vertical in ExploreVertical.allCases.sorted(by: { $0.order < $1.order }) {
-            guard verticals.contains(vertical) else { continue }
-            let matches = items.filter { item in
-                guard item.vertical == vertical else { return false }
-                guard !query.isEmpty else { return true }
-                return item.title.lowercased().contains(query)
-                    || (item.subtitle?.lowercased().contains(query) ?? false)
-                    || (item.excerpt?.lowercased().contains(query) ?? false)
-            }
-            if !matches.isEmpty { sections.append(Section(vertical: vertical, items: matches)) }
+        return items.filter { item in
+            guard item.vertical == vertical else { return false }
+            guard !query.isEmpty else { return true }
+            return item.title.lowercased().contains(query)
+                || (item.subtitle?.lowercased().contains(query) ?? false)
+                || (item.excerpt?.lowercased().contains(query) ?? false)
         }
-        return sections
     }
 
     // MARK: Actions
@@ -238,7 +182,7 @@ struct ExploreView: View {
     }
 }
 
-// MARK: - Poster Card (music / sermons / movies / events)
+// MARK: - Poster Card (music / sermons / events) — flexes to grid cell width
 
 fileprivate struct ExplorePosterCard: View {
     let item: ExploreItem
@@ -248,7 +192,8 @@ fileprivate struct ExplorePosterCard: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 8) {
                 ExploreThumb(url: item.thumbnailURL, icon: item.vertical.icon)
-                    .frame(width: 160, height: 108)
+                    .aspectRatio(3.0 / 2.0, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Text(item.title)
                     .font(.coUI(13, weight: .semibold))
@@ -262,7 +207,7 @@ fileprivate struct ExplorePosterCard: View {
                         .lineLimit(1)
                 }
             }
-            .frame(width: 160, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
     }

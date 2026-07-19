@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
@@ -62,6 +63,12 @@ struct RootView: View {
 struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showKyra = false
+    // Draggable Kyra bubble: committed offset from its default bottom-trailing
+    // anchor, the in-flight drag delta, and a flag that suppresses the tab
+    // swipe while the user is repositioning the bubble.
+    @State private var kyraOffset: CGSize = .zero
+    @State private var kyraDrag: CGSize = .zero
+    @State private var kyraDragging = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -89,22 +96,12 @@ struct MainTabView: View {
             }
 
             // Persistent Kyra access — a floating guide button above the tab
-            // bar, available on every tab. Hidden on detail screens.
+            // bar, available on every tab. Hidden on detail screens. Draggable
+            // so it can be moved off buttons it would otherwise cover.
             if !appState.tabBarHidden {
-                Button { showKyra = true } label: {
-                    Text("K")
-                        .font(.coScripture(22))
-                        .foregroundColor(.white)
-                        .frame(width: 54, height: 54)
-                        .background(Color.coCrossRed)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                GeometryReader { geo in
+                    kyraBubble(in: geo)
                 }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, 20)
-                .padding(.bottom, 82)
                 .transition(.opacity)
             }
         }
@@ -116,7 +113,7 @@ struct MainTabView: View {
         .simultaneousGesture(
             DragGesture(minimumDistance: 30)
                 .onEnded { value in
-                    guard !appState.tabBarHidden else { return }
+                    guard !appState.tabBarHidden, !kyraDragging else { return }
                     let dx = value.translation.width
                     let dy = value.translation.height
                     guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
@@ -141,6 +138,57 @@ struct MainTabView: View {
         .fullScreenCover(isPresented: $showKyra) {
             KyraView().environmentObject(appState)
         }
+    }
+
+    // Draggable floating Kyra bubble. A single DragGesture handles both tap
+    // (open Kyra) and drag (reposition), disambiguated by distance, so it can
+    // be moved off any button it happens to cover. Position is clamped to the
+    // safe area and kept clear of the tab bar, and persists for the session.
+    private func kyraBubble(in geo: GeometryProxy) -> some View {
+        let size: CGFloat = 54
+        let margin: CGFloat = 16
+        let bottomClearance: CGFloat = 82
+        let defaultX = geo.size.width - 20 - size / 2
+        let defaultY = geo.size.height - bottomClearance - size / 2
+        let minX = margin + size / 2
+        let maxX = geo.size.width - margin - size / 2
+        let minY = geo.safeAreaInsets.top + margin + size / 2
+        let maxY = geo.size.height - bottomClearance - size / 2
+        let x = min(max(defaultX + kyraOffset.width + kyraDrag.width, minX), maxX)
+        let y = min(max(defaultY + kyraOffset.height + kyraDrag.height, minY), maxY)
+
+        return Text("K")
+            .font(.coScripture(22))
+            .foregroundColor(.white)
+            .frame(width: size, height: size)
+            .background(Color.coCrossRed)
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
+            .position(x: x, y: y)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        if hypot(v.translation.width, v.translation.height) > 6 {
+                            kyraDragging = true
+                        }
+                        kyraDrag = v.translation
+                    }
+                    .onEnded { v in
+                        let moved = hypot(v.translation.width, v.translation.height)
+                        if moved < 8 {
+                            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                            showKyra = true
+                        } else {
+                            kyraOffset.width += v.translation.width
+                            kyraOffset.height += v.translation.height
+                        }
+                        kyraDrag = .zero
+                        // Reset on the next runloop so the tab-swipe's onEnded,
+                        // which fires in the same gesture cycle, still sees the
+                        // drag flag and stays suppressed.
+                        DispatchQueue.main.async { kyraDragging = false }
+                    }
+            )
     }
 }
 
