@@ -11,14 +11,15 @@ struct CommunityView: View {
     @State private var encouragedIDs: Set<UUID> = []
     @State private var blockedAuthors: Set<String> = []
     @State private var justReportedIDs: Set<UUID> = []
+    // Prayer filter (0041) + church membership (0039)
+    @State private var prayerScope: PrayerScope = .everyone
+    @State private var scopedPrayers: [PrayerRequest] = []
+    @State private var prayerScopeLoading = false
+    @State private var myPrimaryChurchID: UUID? = nil
+    @State private var churchMembershipIDs: [UUID] = []
 
-    private var displayedPrayer: PrayerRequest? {
-        appState.prayers.first(where: { !blockedAuthors.contains($0.authorName) })
-    }
-
-    private var displayedPost: CommunityPost? {
-        appState.posts.first(where: { $0.kind == .verseShare && !blockedAuthors.contains($0.authorName) })
-            ?? appState.posts.first(where: { !blockedAuthors.contains($0.authorName) })
+    private var currentPrayerList: [PrayerRequest] {
+        prayerScope == .everyone ? appState.prayers : scopedPrayers
     }
 
     var body: some View {
@@ -42,6 +43,7 @@ struct CommunityView: View {
                     .padding(.bottom, 90)
                 }
                 .refreshable { await appState.reloadCommunity() }
+                .simultaneousGesture(segmentSwipe)
 
                 if selectedSegment == "My Circle" {
                     bridgeBlock
@@ -57,8 +59,45 @@ struct CommunityView: View {
                 if let fetched = try? await SupabaseService.shared.fetchBlockedAuthors() {
                     blockedAuthors = fetched
                 }
+                await loadMemberships()
             }
         }
+    }
+
+    // MARK: - Segment swipe (top nav)
+
+    /// Horizontal swipe moves between the top segments. On the Community tab the
+    /// RootView tab-swipe is disabled, so this owns horizontal gestures here.
+    private var segmentSwipe: some Gesture {
+        DragGesture(minimumDistance: 30)
+            .onEnded { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }
+                guard let i = segments.firstIndex(of: selectedSegment) else { return }
+                if dx < 0, i < segments.count - 1 {
+                    withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segments[i + 1] }
+                } else if dx > 0, i > 0, value.startLocation.x > 44 {
+                    withAnimation(.easeOut(duration: 0.2)) { selectedSegment = segments[i - 1] }
+                }
+            }
+    }
+
+    private func loadMemberships() async {
+        guard let memberships = try? await SupabaseService.shared.fetchChurchMemberships() else { return }
+        await MainActor.run {
+            churchMembershipIDs = memberships.map { $0.churchID }
+            myPrimaryChurchID = memberships.first(where: { $0.isPrimary })?.churchID
+                ?? memberships.first?.churchID
+        }
+    }
+
+    private func loadScopedPrayers() async {
+        guard prayerScope != .everyone else { return }
+        prayerScopeLoading = true
+        scopedPrayers = (try? await SupabaseService.shared.fetchPrayerRequests(
+            scope: prayerScope, churchID: myPrimaryChurchID)) ?? []
+        prayerScopeLoading = false
     }
 
     // MARK: - Feed load / error states
@@ -182,72 +221,158 @@ struct CommunityView: View {
         case "Church": churchContent
         case "Prayer": prayerContent
         case "Micro": MicroSegmentView()
-        default: myCircleContent
+        default: CircleSegmentView(onOpenPrayers: {
+            withAnimation(.easeOut(duration: 0.2)) {
+                selectedSegment = "Prayer"
+                prayerScope = .circle
+            }
+            Task { await loadScopedPrayers() }
+        })
         }
     }
 
-    private var myCircleContent: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            COSectionHeader(title: "Prayer Requests", actionTitle: "See all") {
-                withAnimation(.easeOut(duration: 0.2)) { selectedSegment = "Prayer" }
-            }
-            if let request = displayedPrayer {
-                prayerCard(request)
-            } else {
-                COEmptyState(
-                    icon: .prayer,
-                    title: "No prayer requests yet",
-                    message: "Be the first to share what you're carrying — your circle is here for you.",
-                    actionTitle: "Share a request"
-                ) {
-                    showNewPost = true
-                }
-            }
-            if let post = displayedPost {
-                verseCard(post)
-            }
-        }
-    }
+    // MARK: - Church segment (your churches + community)
 
     private var churchContent: some View {
+        let joined = appState.churches.filter { churchMembershipIDs.contains($0.id) }
         let churchPosts = appState.posts.filter { !blockedAuthors.contains($0.authorName) }
-        return VStack(alignment: .leading, spacing: 16) {
-            COSectionHeader(title: "From Your Church")
-            if churchPosts.isEmpty {
-                COEmptyState(
-                    icon: .church,
-                    title: "Nothing from your church yet",
-                    message: "Follow a church in Attend to see its posts here."
-                )
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(churchPosts) { post in
-                        verseCard(post)
+        return VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 12) {
+                COSectionHeader(title: "Your Churches")
+                if joined.isEmpty {
+                    COCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("You haven't joined a church yet.")
+                                .font(.coUI(14, weight: .medium))
+                                .foregroundColor(.coInk)
+                            Text("Join a church to keep it close and follow its community here.")
+                                .font(.coUI(13))
+                                .foregroundColor(.coInkSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(joined) { joinedChurchRow($0) }
+                    }
+                }
+                NavigationLink { ChurchFinderView() } label: {
+                    HStack(spacing: 6) {
+                        COIcon(.search, size: 14, color: .coCrossRed)
+                        Text(joined.isEmpty ? "Find a church" : "Find another church")
+                            .font(.coUI(13, weight: .semibold))
+                            .foregroundColor(.coCrossRed)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                COSectionHeader(title: "From the Community")
+                if churchPosts.isEmpty {
+                    COEmptyState(
+                        icon: .church,
+                        title: "Nothing shared yet",
+                        message: "Verse shares and testimonies from the community will appear here."
+                    )
+                } else {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(churchPosts) { post in verseCard(post) }
                     }
                 }
             }
         }
     }
 
-    private var prayerContent: some View {
-        let list = appState.prayers.filter { !blockedAuthors.contains($0.authorName) }
-        return VStack(alignment: .leading, spacing: 16) {
-            COSectionHeader(title: "Prayer Requests")
-            if list.isEmpty {
-                COEmptyState(
-                    icon: .prayer,
-                    title: "No prayer requests yet",
-                    message: "Be the first to share what you're carrying — your circle is here for you.",
-                    actionTitle: "Share a request"
-                ) {
-                    showNewPost = true
+    private func joinedChurchRow(_ church: Church) -> some View {
+        COCard {
+            HStack(spacing: 12) {
+                COAvatar(initials: String(church.name.prefix(1)).uppercased(), size: 36)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(church.name)
+                        .font(.coUI(15, weight: .semibold))
+                        .foregroundColor(.coInk)
+                        .lineLimit(1)
+                    Text(church.city)
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkTertiary)
+                        .lineLimit(1)
                 }
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(list) { request in
-                        prayerCard(request)
+                Spacer()
+                if church.isLive {
+                    Text("LIVE")
+                        .font(.coUI(10, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.coCrossRed))
+                }
+            }
+        }
+    }
+
+    // MARK: - Prayer segment (with scope filter)
+
+    private var prayerContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            prayerScopeChips
+            prayerList
+        }
+    }
+
+    private var prayerScopeChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(PrayerScope.allCases) { scope in
+                    COChip(text: scope.title, selected: prayerScope == scope) {
+                        guard prayerScope != scope else { return }
+                        prayerScope = scope
+                        Task { await loadScopedPrayers() }
                     }
                 }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    @ViewBuilder
+    private var prayerList: some View {
+        if prayerScopeLoading {
+            feedLoadingState
+        } else {
+            let list = currentPrayerList.filter { !blockedAuthors.contains($0.authorName) }
+            if list.isEmpty {
+                prayerEmptyState
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(list) { request in prayerCard(request) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var prayerEmptyState: some View {
+        if prayerScope == .myChurch && myPrimaryChurchID == nil {
+            COEmptyState(
+                icon: .church,
+                title: "Join a church first",
+                message: "Join a church in the Church tab to see prayer requests from its members."
+            )
+        } else if prayerScope == .circle {
+            COEmptyState(
+                icon: .community,
+                title: "No circle prayers yet",
+                message: "Create or join a circle in My Circle — then prayer requests from your circle show up here."
+            )
+        } else {
+            COEmptyState(
+                icon: .prayer,
+                title: "No prayer requests yet",
+                message: "Be the first to share what you're carrying — your community is here for you.",
+                actionTitle: "Share a request"
+            ) {
+                showNewPost = true
             }
         }
     }

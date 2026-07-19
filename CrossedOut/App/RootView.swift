@@ -114,6 +114,9 @@ struct MainTabView: View {
             DragGesture(minimumDistance: 30)
                 .onEnded { value in
                     guard !appState.tabBarHidden, !kyraDragging else { return }
+                    // On Community, horizontal swipes drive its top segments,
+                    // so the tab-swipe stands down there.
+                    guard appState.selectedTab != .community else { return }
                     let dx = value.translation.width
                     let dy = value.translation.height
                     guard abs(dx) > 60, abs(dx) > abs(dy) * 1.5 else { return }

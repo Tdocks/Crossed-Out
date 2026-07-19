@@ -175,6 +175,35 @@ struct Micro: Identifiable, Codable, Hashable {
     }
 }
 
+// MARK: - Circles (migration 0040)
+
+struct PrayerCircle: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let joinCode: String
+    /// App-computed (via circle_member_count RPC); not decoded from the row.
+    var memberCount: Int = 0
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case joinCode = "join_code"
+    }
+}
+
+/// Audience filter for the prayer feed (migration 0041).
+enum PrayerScope: String, CaseIterable, Identifiable {
+    case everyone, myChurch, mine, circle
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .everyone: return "Everyone"
+        case .myChurch: return "My Church"
+        case .mine: return "Mine"
+        case .circle: return "My Circle"
+        }
+    }
+}
+
 /// One entry in a micro's feed. `pinned` is computed SERVER-SIDE by the
 /// micro_feed RPC (announcement + unexpired); expired announcements fall
 /// into the normal chronological feed.

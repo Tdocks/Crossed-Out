@@ -22,6 +22,7 @@
 		20D200C1A012404A338C0F35 /* TabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFA439125C7FB6B3DC9361B /* TabBar.swift */; };
 		29C3C08C042DBD4D2AFC7567 /* JourneyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8418F244D418C4D90CD398C /* JourneyProgressView.swift */; };
 		2C2D824AEA0718B14BDE2F71 /* SupabaseService+Admin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B86CF24DDF450708EDC414 /* SupabaseService+Admin.swift */; };
+		2D1E9A5EC814045FFC4C84EC /* CircleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1720ADF5998230D885908900 /* CircleViews.swift */; };
 		3610EDD386C4A8DA78702FE2 /* SupabaseService+Kyra.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */; };
 		3A25B6D7306D2B5E956767E9 /* EmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB434650612A2DEA8A15E75 /* EmptyState.swift */; };
 		3CCDB9709FC2C5B863581E71 /* SupabaseService+Journey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A84803C9A480BD18E6F4E7 /* SupabaseService+Journey.swift */; };
@@ -42,6 +43,7 @@
 		619A2CA17D28D848EFCFE417 /* PathPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16F51D67613210D704EE7AB /* PathPickerSheet.swift */; };
 		66535BF74709A253E785EAE7 /* Inter.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 92844B9A5A8AE42B2D505A3D /* Inter.ttf */; };
 		67FD6C93898D75B938F6D671 /* CommunityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA5558BACBD522E5204A0D58 /* CommunityView.swift */; };
+		6FDEC55E8669425BCA311251 /* SupabaseService+Community.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92FC0A26F6ADB897A72A81AF /* SupabaseService+Community.swift */; };
 		701E25D0DC30B363CF8E9188 /* LegalDocuments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C25B8FE11089F504B853D2D /* LegalDocuments.swift */; };
 		718E58F37AC21CFEAC13D45F /* CrisisSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA313CE758BF252E8A734716 /* CrisisSupportView.swift */; };
 		71A9F23F90AF5155B0D6BEA3 /* LegalConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1857AC2A298FD8CD86D89D /* LegalConsentView.swift */; };
@@ -118,8 +120,9 @@
 		05BD1522B21FF7FA165C822B /* DevotionalsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevotionalsHubView.swift; sourceTree = "<group>"; };
 		0A9844F06CCD645DD9C91A8D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		0D4A83A506B6EF6EB332363A /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
-		19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CrossedOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		215D9A57FD56EC79B037B86C /* CrossedOutWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrossedOutWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1720ADF5998230D885908900 /* CircleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleViews.swift; sourceTree = "<group>"; };
+		19DDF8FC75D31CBB6A1F4CF0 /* CrossedOut.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CrossedOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		215D9A57FD56EC79B037B86C /* CrossedOutWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CrossedOutWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		244B30446FDFB2BFF005543F /* BridgeShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeShareView.swift; sourceTree = "<group>"; };
 		27F1869D01464C15D55E9FCE /* AppGroupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupStore.swift; sourceTree = "<group>"; };
 		2BC850C24445A437BED5E29A /* DevotionalComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevotionalComponents.swift; sourceTree = "<group>"; };
@@ -151,6 +154,7 @@
 		88745AB55D413F7CE574533E /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		898E37D75F1F71B57D185341 /* SupabaseService+Kyra.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Kyra.swift"; sourceTree = "<group>"; };
 		92844B9A5A8AE42B2D505A3D /* Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
+		92FC0A26F6ADB897A72A81AF /* SupabaseService+Community.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupabaseService+Community.swift"; sourceTree = "<group>"; };
 		9791AD109D3CAA8FD9A9AB02 /* PlusPaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlusPaywallView.swift; sourceTree = "<group>"; };
 		9A1857AC2A298FD8CD86D89D /* LegalConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalConsentView.swift; sourceTree = "<group>"; };
 		9BF74E32355BCCC414036E57 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -358,6 +362,7 @@
 		997EEC33C3166F32B2D0A1F8 /* Community */ = {
 			isa = PBXGroup;
 			children = (
+				1720ADF5998230D885908900 /* CircleViews.swift */,
 				EA5558BACBD522E5204A0D58 /* CommunityView.swift */,
 				EA326AF9C43C54E22F53A55C /* MicroViews.swift */,
 			);
@@ -393,6 +398,7 @@
 				B1D7F8BE79CE96D447C4136C /* SupabaseService+Attend.swift */,
 				7B021856464D7386FB22045A /* SupabaseService+Badges.swift */,
 				A94BCBB46D66E5C6DA54B80F /* SupabaseService+Bridge.swift */,
+				92FC0A26F6ADB897A72A81AF /* SupabaseService+Community.swift */,
 				CB7EA34F7433DE0A14AD0B71 /* SupabaseService+Devotionals.swift */,
 				D7EBA9FD90CE6251521DFF9B /* SupabaseService+Explore.swift */,
 				37A84803C9A480BD18E6F4E7 /* SupabaseService+Journey.swift */,
@@ -570,13 +576,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2660;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					46A291D45EFBB41A9C36411E = {
 						DevelopmentTeam = Q9ZH8AA9NY;
 						ProvisioningStyle = Automatic;
 					};
 					A4467E10A41E0D9A90C308AC = {
+						DevelopmentTeam = Q9ZH8AA9NY;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -644,6 +651,7 @@
 				3D6BA3533BE2B9120BF52C6C /* ChurchFinderView.swift in Sources */,
 				B8E303DD8B56441988EA9AD2 /* ChurchFormComponents.swift in Sources */,
 				08C6FFC53D2BE341C3DEA8D2 /* ChurchManageView.swift in Sources */,
+				2D1E9A5EC814045FFC4C84EC /* CircleViews.swift in Sources */,
 				67FD6C93898D75B938F6D671 /* CommunityView.swift in Sources */,
 				181037C41BB02857ECE062B5 /* Components.swift in Sources */,
 				718E58F37AC21CFEAC13D45F /* CrisisSupportView.swift in Sources */,
@@ -682,6 +690,7 @@
 				528FE0E6CA580B78E511B808 /* SupabaseService+Attend.swift in Sources */,
 				112B652CA281B417ADA7A879 /* SupabaseService+Badges.swift in Sources */,
 				4BE8BE27D7755F35F392E8E0 /* SupabaseService+Bridge.swift in Sources */,
+				6FDEC55E8669425BCA311251 /* SupabaseService+Community.swift in Sources */,
 				0A2AB2CD09C5010AEDC8B055 /* SupabaseService+Devotionals.swift in Sources */,
 				488030720690372FFE6C2C39 /* SupabaseService+Explore.swift in Sources */,
 				3CCDB9709FC2C5B863581E71 /* SupabaseService+Journey.swift in Sources */,
@@ -725,6 +734,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = CrossedOut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -774,7 +784,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -797,7 +806,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -810,12 +818,9 @@
 				CODE_SIGN_ENTITLEMENTS = CrossedOutWidgets/CrossedOutWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				INFOPLIST_FILE = CrossedOutWidgets/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tdocks.crossedout.widgets;
 				SDKROOT = iphoneos;
@@ -833,6 +838,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = CrossedOut/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -853,12 +859,9 @@
 				CODE_SIGN_ENTITLEMENTS = CrossedOutWidgets/CrossedOutWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				INFOPLIST_FILE = CrossedOutWidgets/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tdocks.crossedout.widgets;
 				SDKROOT = iphoneos;
@@ -903,7 +906,6 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = Q9ZH8AA9NY;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -919,7 +921,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;

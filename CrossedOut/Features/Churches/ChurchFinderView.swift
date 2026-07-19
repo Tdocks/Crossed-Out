@@ -7,13 +7,21 @@ import UIKit
 struct ChurchFinderView: View {
     @EnvironmentObject private var appState: AppState
     @State private var savedChurchIDs: Set<UUID> = []
+    @State private var joinedChurchIDs: Set<UUID> = []
     @State private var selectedStyleFilter: String = "All"
+    @State private var searchText: String = ""
 
     private let filterOptions = ["All", "Contemporary", "Worship", "Bible Teaching", "Teaching"]
 
     private var filteredChurches: [Church] {
-        guard selectedStyleFilter != "All" else { return appState.churches }
-        return appState.churches.filter { $0.style == selectedStyleFilter }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return appState.churches.filter { church in
+            let styleOK = selectedStyleFilter == "All" || church.style == selectedStyleFilter
+            let searchOK = query.isEmpty
+                || church.name.lowercased().contains(query)
+                || church.city.lowercased().contains(query)
+            return styleOK && searchOK
+        }
     }
 
     var body: some View {
@@ -26,7 +34,7 @@ struct ChurchFinderView: View {
                         .foregroundColor(.coInk)
                         .padding(.top, 8)
 
-                    locationRow
+                    searchRow
 
                     if appState.attendLoading {
                         loadingState
@@ -64,13 +72,39 @@ struct ChurchFinderView: View {
                 .padding(.bottom, 90)
             }
         }
-        .task { await loadSavedChurchIDs() }
+        .task {
+            await loadSavedChurchIDs()
+            await loadJoinedChurchIDs()
+        }
     }
 
     private func loadSavedChurchIDs() async {
         guard let ids = try? await SupabaseService.shared.fetchSavedChurchIDs() else { return }
         await MainActor.run {
             savedChurchIDs = ids
+        }
+    }
+
+    private func loadJoinedChurchIDs() async {
+        guard let memberships = try? await SupabaseService.shared.fetchChurchMemberships() else { return }
+        await MainActor.run {
+            joinedChurchIDs = Set(memberships.map { $0.churchID })
+        }
+    }
+
+    private func toggleJoined(_ church: Church) {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        let churchID = church.id
+        let newValue = !joinedChurchIDs.contains(churchID)
+        withAnimation(.easeOut(duration: 0.2)) {
+            if newValue { joinedChurchIDs.insert(churchID) } else { joinedChurchIDs.remove(churchID) }
+        }
+        Task {
+            if newValue {
+                await SupabaseService.shared.joinChurch(churchID: churchID)
+            } else {
+                await SupabaseService.shared.leaveChurch(churchID: churchID)
+            }
         }
     }
 
@@ -104,15 +138,32 @@ struct ChurchFinderView: View {
         .padding(.vertical, 60)
     }
 
-    // MARK: Location Row
+    // MARK: Search + style filter
 
-    private var locationRow: some View {
-        HStack(spacing: 8) {
-            COIcon(.mapPin, size: 16, color: .coInkSecondary)
-            Text("Charlotte, NC")
-                .font(.coUI(14))
-                .foregroundColor(.coInk)
-            Spacer()
+    private var searchRow: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                COIcon(.search, size: 16, color: .coInkTertiary)
+                TextField("Search by name or city…", text: $searchText)
+                    .font(.coUI(15))
+                    .foregroundColor(.coInk)
+                    .autocorrectionDisabled()
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        COIcon(.crossOut, size: 14, color: .coInkTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(Color.coCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.coDivider, lineWidth: 1)
+            )
+
             Menu {
                 ForEach(filterOptions, id: \.self) { option in
                     Button {
@@ -126,16 +177,30 @@ struct ChurchFinderView: View {
                     }
                 }
             } label: {
-                Text(selectedStyleFilter == "All" ? "Filter" : selectedStyleFilter)
-                    .font(.coUI(13))
-                    .foregroundColor(selectedStyleFilter == "All" ? .coInkSecondary : .coCrossRed)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
+                COIcon(.study, size: 18, color: selectedStyleFilter == "All" ? .coInkSecondary : .coCrossRed)
+                    .frame(width: 46, height: 46)
                     .overlay(
-                        Capsule().strokeBorder(selectedStyleFilter == "All" ? Color.coDivider : Color.coCrossRed, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(selectedStyleFilter == "All" ? Color.coDivider : Color.coCrossRed, lineWidth: 1)
                     )
             }
         }
+    }
+
+    private func joinButton(for church: Church) -> some View {
+        let joined = joinedChurchIDs.contains(church.id)
+        return Button {
+            toggleJoined(church)
+        } label: {
+            Text(joined ? "Joined" : "Join")
+                .font(.coUI(13, weight: .semibold))
+                .foregroundColor(joined ? .coOlive : .white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(joined ? Color.clear : Color.coCrossRed))
+                .overlay(Capsule().strokeBorder(joined ? Color.coOlive.opacity(0.5) : Color.clear, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Church Row
@@ -154,14 +219,12 @@ struct ChurchFinderView: View {
                         .foregroundColor(.coInkSecondary)
                 }
                 Spacer()
-                Text(String(format: "%.1f mi", church.distanceMiles))
-                    .font(.coUI(12))
-                    .foregroundColor(.coInkTertiary)
+                joinButton(for: church)
                 Button {
                     toggleSaved(church)
                 } label: {
                     COIcon(.heart, size: 18, color: isSaved ? .coCrossRed : .coInkTertiary)
-                        .padding(.leading, 4)
+                        .padding(.leading, 6)
                 }
                 .buttonStyle(.plain)
             }
