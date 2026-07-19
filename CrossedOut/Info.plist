@@ -24,6 +24,8 @@
 	<false/>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>Crossed Out can add a calendar event when you plan a church visit.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Crossed Out uses your location to find churches near you.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>PlayfairDisplay-Regular.ttf</string>

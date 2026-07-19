@@ -56,6 +56,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         CFBundleDisplayName: Crossed Out
         NSCalendarsWriteOnlyAccessUsageDescription: "Crossed Out can add a calendar event when you plan a church visit."
+        NSLocationWhenInUseUsageDescription: "Crossed Out uses your location to find churches near you."
   CrossedOutWidgets:
     type: app-extension
     platform: iOS
