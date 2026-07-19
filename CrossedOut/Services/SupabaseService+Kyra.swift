@@ -161,7 +161,7 @@ extension SupabaseService {
             guard let text = decoded.text, !text.isEmpty else {
                 throw KyraServiceError.missingText
             }
-            await onDelta(text)
+            onDelta(text)
             return text
         }
 
@@ -176,7 +176,7 @@ extension SupabaseService {
                 let chunk = try? JSONDecoder().decode(KyraStreamDelta.self, from: data)
             else { continue }
             full += chunk.delta
-            await onDelta(chunk.delta)
+            onDelta(chunk.delta)
         }
 
         guard !full.isEmpty else {
