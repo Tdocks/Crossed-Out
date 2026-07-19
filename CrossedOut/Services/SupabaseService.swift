@@ -125,6 +125,7 @@ struct PrayerRequestDTO: Codable {
         PrayerRequest(
             id: id,
             authorName: authorName,
+            authorUserId: userId,
             timeAgo: SupabaseService.relativeTime(from: createdAt),
             text: body,
             prayedCount: prayedCount,
@@ -167,6 +168,7 @@ struct CommunityPostDTO: Codable {
         CommunityPost(
             id: id,
             authorName: authorName,
+            authorUserId: userId,
             timeAgo: SupabaseService.relativeTime(from: createdAt),
             kind: postKind,
             text: body,
@@ -677,24 +679,32 @@ extension SupabaseService {
         }
     }
 
-    private struct BridgeShareInsert: Encodable {
+    private struct CommunityPostInsert: Encodable {
         let user_id: UUID
-        let to_name: String
-        let why_text: String
-        let verse_ref: String
-        let verse_text: String
+        let author_name: String
+        let kind: String
+        let body: String
+        let verse_ref: String?
+        let verse_text: String?
     }
 
-    func insertBridgeShare(toName: String, whyText: String, verseRef: String, verseText: String) async {
-        guard let uid = currentUserID else { return }
-        let payload = BridgeShareInsert(
-            user_id: uid, to_name: toName, why_text: whyText,
-            verse_ref: verseRef, verse_text: verseText
+    /// Inserts a community post (testimony / verse share). Insert is gated
+    /// server-side to `active` accounts (0021's insert policy). Returns
+    /// false on failure so the composer can show an honest error.
+    @discardableResult
+    func insertCommunityPost(authorName: String, kind: String, body: String,
+                             verseRef: String? = nil, verseText: String? = nil) async -> Bool {
+        guard let uid = currentUserID else { return false }
+        let payload = CommunityPostInsert(
+            user_id: uid, author_name: authorName, kind: kind,
+            body: body, verse_ref: verseRef, verse_text: verseText
         )
         do {
-            try await client.from("bridge_shares").insert(payload).execute()
+            try await client.from("community_posts").insert(payload).execute()
+            return true
         } catch {
-            print("SupabaseService: insertBridgeShare failed: \(error)")
+            print("SupabaseService: insertCommunityPost failed: \(error)")
+            return false
         }
     }
 }
@@ -1012,12 +1022,53 @@ extension SupabaseService {
     }
 }
 
+// MARK: - Practice Action (today_practice_action RPC — migration 0025)
+
+private struct TodayPracticeActionParams: Encodable {
+    let p_focus_slugs: [String]?
+    let p_mood: String?
+}
+
+private struct TodayPracticeActionRow: Decodable {
+    let id: UUID
+    let body: String
+    let focus_slug: String?
+}
+
+extension SupabaseService {
+    /// Deterministic "one small step" for today: relevance-tiered
+    /// (focus match, then mood match) with a per-user-per-day stable
+    /// shuffle server-side. Returns nil if the RPC isn't deployed, the
+    /// seed table is empty, or the user is signed out — callers hide the
+    /// card entirely in that case.
+    func fetchTodayPracticeAction(focusSlugs: [String], mood: String?) async -> PracticeAction? {
+        guard isAuthenticated else { return nil }
+        do {
+            let rows: [TodayPracticeActionRow] = try await client
+                .rpc("today_practice_action", params: TodayPracticeActionParams(
+                    p_focus_slugs: focusSlugs.isEmpty ? nil : focusSlugs,
+                    p_mood: mood
+                ))
+                .execute()
+                .value
+            guard let row = rows.first else { return nil }
+            return PracticeAction(id: row.id, body: row.body, focusSlug: row.focus_slug)
+        } catch {
+            print("SupabaseService: fetchTodayPracticeAction failed: \(error)")
+            return nil
+        }
+    }
+}
+
 // MARK: - Kyra AI Chat
 
 enum KyraServiceError: Error {
     case notSignedIn
     case badResponse
     case missingText
+    /// The per-user daily cap (edge function, migration 0008) was hit —
+    /// the UI shows a gentle "come back tomorrow" state, not an error.
+    case dailyLimitReached
 }
 
 private struct KyraRequestMessage: Encodable {
@@ -1063,6 +1114,9 @@ extension SupabaseService {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            if (response as? HTTPURLResponse)?.statusCode == 429 {
+                throw KyraServiceError.dailyLimitReached
+            }
             throw KyraServiceError.badResponse
         }
         let decoded = try JSONDecoder().decode(KyraResponseBody.self, from: data)

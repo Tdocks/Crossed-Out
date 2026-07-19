@@ -53,7 +53,7 @@ struct OnboardingView: View {
                         await appState.completeOnboarding(
                             name: resolvedName,
                             focus: Array(selectedFocus),
-                            need: needText.isEmpty ? MockData.profile.need : needText
+                            need: needText
                         )
                     }
                 }

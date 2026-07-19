@@ -104,6 +104,74 @@ extension SupabaseService {
     }
 }
 
+// MARK: - Private reflections (migration 0028)
+// PRIVACY: reflections are own-rows RLS data. They are read and written ONLY
+// through these table calls — never included in any edge-function payload,
+// so no AI (Kyra, devotional_suggest, semantic_search) ever receives them.
+// The schema's `shared_with_kyra` column is a seam for a possible FUTURE
+// explicit opt-in; the app neither sets nor reads it today.
+
+extension SupabaseService {
+
+    private struct ReflectionUpsert: Encodable {
+        let user_id: UUID
+        let devotional_id: UUID
+        let body: String
+    }
+
+    /// The current user's reflection for one devotional, if any.
+    /// Throws on network failure so callers can distinguish "none yet"
+    /// from "couldn't load".
+    func fetchMyReflection(devotionalID: UUID) async throws -> DevotionalReflection? {
+        guard let uid = currentUserID else { return nil }
+        let rows: [DevotionalReflection] = try await client
+            .from("devotional_reflections")
+            .select("id, devotional_id, body, reflected_on, updated_at")
+            .eq("user_id", value: uid)
+            .eq("devotional_id", value: devotionalID)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Create-or-update the user's reflection for a devotional
+    /// (one per user per devotional; upsert on that unique pair).
+    func saveReflection(devotionalID: UUID, body: String) async -> Bool {
+        guard let uid = currentUserID else { return false }
+        let payload = ReflectionUpsert(
+            user_id: uid,
+            devotional_id: devotionalID,
+            body: String(body.prefix(8000))
+        )
+        do {
+            try await client
+                .from("devotional_reflections")
+                .upsert(payload, onConflict: "user_id,devotional_id")
+                .execute()
+            return true
+        } catch {
+            print("SupabaseService: saveReflection failed: \(error)")
+            return false
+        }
+    }
+
+    /// Archive: the user's reflections with their devotionals joined,
+    /// newest-edited first. Throws so the hub can show an error state.
+    func listMyReflections(limit: Int = 100) async throws -> [DevotionalReflection] {
+        guard let uid = currentUserID else { return [] }
+        let rows: [DevotionalReflection] = try await client
+            .from("devotional_reflections")
+            .select("id, devotional_id, body, reflected_on, updated_at, devotionals(id, title, verse_ref, book, chapter, verse, verse_end, body, prompt, style, focus_slug, tags)")
+            .eq("user_id", value: uid)
+            .order("updated_at", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+        return rows
+    }
+}
+
 // MARK: - Tier 2 (deterministic re-roll) + Tier 3 (gated AI suggestion)
 
 extension SupabaseService {

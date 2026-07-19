@@ -43,6 +43,12 @@ struct AuthSheet: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
     @State private var currentNonce: String?
+    /// Required agreement to the Terms/EULA before an account can be created
+    /// (App Review 1.2 — UGC apps need explicit consent to zero-tolerance
+    /// terms). Sign-in mode doesn't show it; legacy accounts are handled by
+    /// LegalAcceptanceGateView instead.
+    @State private var agreedToTerms = false
+    @State private var presentedLegalDoc: LegalDoc?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -68,6 +74,11 @@ struct AuthSheet: View {
             authField("Password", text: $password, secure: true)
                 .padding(.top, 12)
 
+            if mode == .createAccount {
+                LegalConsentRow(agreed: $agreedToTerms, presentedDoc: $presentedLegalDoc)
+                    .padding(.top, 18)
+            }
+
             if let errorMessage {
                 Text(errorMessage)
                     .font(.coUI(13))
@@ -87,10 +98,17 @@ struct AuthSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.coPaper.ignoresSafeArea())
         .presentationDetents([.medium, .large])
+        .sheet(item: $presentedLegalDoc) { LegalDocView(doc: $0) }
     }
 
     private var isValid: Bool {
-        email.contains("@") && password.count >= 6
+        email.contains("@") && password.count >= 6 && consentSatisfied
+    }
+
+    /// Creating an account requires the Terms agreement; signing back in
+    /// does not (the in-app acceptance gate covers legacy accounts).
+    private var consentSatisfied: Bool {
+        mode == .signIn || agreedToTerms
     }
 
     private var appleButtonLabel: SignInWithAppleButton.Label {
@@ -102,6 +120,21 @@ struct AuthSheet: View {
             .signInWithAppleButtonStyle(.black)
             .frame(height: 50)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .opacity(consentSatisfied ? 1 : 0.5)
+            .overlay {
+                // SignInWithAppleButton has no .disabled-friendly styling;
+                // intercept taps until the Terms are agreed to and explain
+                // why, instead of silently doing nothing.
+                if !consentSatisfied {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                errorMessage = "Please agree to the Terms below first."
+                            }
+                        }
+                }
+            }
     }
 
     private var orDivider: some View {
@@ -149,6 +182,7 @@ struct AuthSheet: View {
                     try await SupabaseService.shared.signIn(email: email, password: password)
                 case .createAccount:
                     try await SupabaseService.shared.signUp(email: email, password: password)
+                    recordConsent()
                 }
                 isLoading = false
                 onSuccess(nil)
@@ -159,6 +193,15 @@ struct AuthSheet: View {
                     errorMessage = friendlyError(error)
                 }
             }
+        }
+    }
+
+    /// Fire-and-forget record of the Terms acceptance the user just gave on
+    /// this screen (migration 0023). Idempotent; also cached locally so the
+    /// acceptance gate never re-prompts this account on this device.
+    private func recordConsent() {
+        Task {
+            await SupabaseService.shared.recordLegalAcceptance(version: LegalDocuments.termsVersion)
         }
     }
 
@@ -205,6 +248,7 @@ struct AuthSheet: View {
             Task {
                 do {
                     try await SupabaseService.shared.signInWithApple(idToken: idToken, nonce: nonce)
+                    if mode == .createAccount { recordConsent() }
                     isLoading = false
                     onSuccess(appleGivenName)
                     dismiss()

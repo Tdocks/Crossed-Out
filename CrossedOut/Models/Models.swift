@@ -32,6 +32,17 @@ enum Mood: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Practice Action
+
+/// One small, concrete "act" step for the Today loop, picked
+/// deterministically by the `today_practice_action` RPC (migration 0025)
+/// from focus areas + today's mood. Stable for the whole day.
+struct PracticeAction: Identifiable, Codable, Hashable {
+    let id: UUID
+    let body: String
+    let focusSlug: String?
+}
+
 // MARK: - Scripture
 
 struct VerseRef: Codable, Hashable {
@@ -116,6 +127,9 @@ struct StreakState: Codable, Hashable {
 struct PrayerRequest: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     let authorName: String
+    /// Author's account id when known — used so blocking targets the
+    /// account, not just the display name.
+    var authorUserId: UUID? = nil
     let timeAgo: String
     let text: String
     var prayedCount: Int
@@ -129,12 +143,59 @@ enum PostKind: String, Codable, Hashable {
 struct CommunityPost: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     let authorName: String
+    /// Author's account id when known — used so blocking targets the
+    /// account, not just the display name.
+    var authorUserId: UUID? = nil
     let timeAgo: String
     let kind: PostKind
     let text: String
     var verseRef: String?
     var verseText: String?
     var heartCount: Int
+}
+
+// MARK: - Micros (migration 0030)
+
+/// A local micro-site group: people who meet up in person to watch streamed
+/// church together and coordinate in a small shared space.
+struct Micro: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let description: String
+    let city: String?
+    let ownerUserId: UUID
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, city
+        case ownerUserId = "owner_user_id"
+        case createdAt = "created_at"
+    }
+}
+
+/// One entry in a micro's feed. `pinned` is computed SERVER-SIDE by the
+/// micro_feed RPC (announcement + unexpired); expired announcements fall
+/// into the normal chronological feed.
+struct MicroPost: Identifiable, Codable, Hashable {
+    let id: UUID
+    let microId: UUID
+    let authorUserId: UUID
+    let authorName: String
+    let body: String
+    let isAnnouncement: Bool
+    let expiresAt: String?
+    let createdAt: String?
+    let pinned: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, body, pinned
+        case microId = "micro_id"
+        case authorUserId = "author_user_id"
+        case authorName = "author_name"
+        case isAnnouncement = "is_announcement"
+        case expiresAt = "expires_at"
+        case createdAt = "created_at"
+    }
 }
 
 // MARK: - Attend & Give
@@ -192,12 +253,8 @@ struct GiveProject: Identifiable, Codable, Hashable {
 
 // MARK: - Bridge & Kyra
 
-struct BridgeShare: Identifiable, Codable, Hashable {
-    var id: UUID = UUID()
-    let toName: String
-    let whyText: String
-    let verse: Passage
-}
+// (BridgeShare's mock model was replaced by the live SentBridge /
+// BridgeResponse in SupabaseService+Bridge.swift, migration 0031.)
 
 enum ChatRole: String, Codable, Hashable {
     case user, kyra
@@ -347,6 +404,27 @@ struct UserDevotional: Identifiable, Codable, Hashable {
         case verseEnd = "verse_end"
         case studiedOn = "studied_on"
         case createdAt = "created_at"
+    }
+}
+
+/// A user's private reflection on a built-in devotional (one per user per
+/// devotional; editing updates it). PRIVACY: own-rows RLS only (migration
+/// 0028); never sent to Kyra or any AI. `devotional` is the joined catalog
+/// row when fetched for the archive.
+struct DevotionalReflection: Identifiable, Codable, Hashable {
+    let id: UUID
+    let devotionalId: UUID
+    let body: String
+    let reflectedOn: String
+    let updatedAt: String?
+    let devotional: Devotional?
+
+    enum CodingKeys: String, CodingKey {
+        case id, body
+        case devotionalId = "devotional_id"
+        case reflectedOn = "reflected_on"
+        case updatedAt = "updated_at"
+        case devotional = "devotionals"
     }
 }
 

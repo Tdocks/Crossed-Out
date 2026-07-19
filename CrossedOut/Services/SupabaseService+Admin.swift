@@ -141,6 +141,75 @@ extension SupabaseService {
         return try await client.rpc("create_church_invite", params: params).execute().value
     }
 
+    // MARK: Moderation queue (migration 0029)
+
+    /// One open content report with the offending content joined in.
+    struct ModerationReport: Identifiable, Hashable {
+        let id: UUID
+        let createdAt: String?
+        let contentKind: String
+        let contentID: UUID?
+        let reason: String
+        let detail: String?
+        let reportCount: Int
+        let authorName: String?
+        let contentText: String?
+        let contentStatus: String?
+    }
+
+    private struct ModerationReportDTO: Decodable {
+        let reportId: UUID
+        let createdAt: String?
+        let contentKind: String
+        let contentId: UUID?
+        let reason: String
+        let detail: String?
+        let reportCount: Int
+        let authorName: String?
+        let contentText: String?
+        let contentStatus: String?
+
+        enum CodingKeys: String, CodingKey {
+            case reportId = "report_id"
+            case createdAt = "created_at"
+            case contentKind = "content_kind"
+            case contentId = "content_id"
+            case reason, detail
+            case reportCount = "report_count"
+            case authorName = "author_name"
+            case contentText = "content_text"
+            case contentStatus = "content_status"
+        }
+    }
+
+    /// Open reports, newest first (system_admin only — the RPC returns
+    /// nothing for anyone else). Throws so the queue can show an error state.
+    func adminListOpenReports() async throws -> [ModerationReport] {
+        let dtos: [ModerationReportDTO] = try await client
+            .rpc("admin_list_open_reports").execute().value
+        return dtos.map {
+            ModerationReport(
+                id: $0.reportId, createdAt: $0.createdAt, contentKind: $0.contentKind,
+                contentID: $0.contentId, reason: $0.reason, detail: $0.detail,
+                reportCount: $0.reportCount, authorName: $0.authorName,
+                contentText: $0.contentText, contentStatus: $0.contentStatus
+            )
+        }
+    }
+
+    private struct ResolveReportParams: Encodable {
+        let p_report_id: UUID
+        let p_action: String
+    }
+
+    /// Resolve a report: "dismiss" closes it; "hide" / "remove" change the
+    /// content's visibility and close every open report on that content.
+    func adminResolveReport(reportID: UUID, action: String) async throws {
+        try await client.rpc("admin_resolve_report",
+                             params: ResolveReportParams(p_report_id: reportID, p_action: action))
+            .execute()
+    }
+
     // MARK: Add a church (system-admin) via the add_church edge function
     //
     // Resolves the YouTube channel, upserts the church, and wires up a

@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var focus: Set<String> = []
     @State private var showDeleteConfirm = false
     @State private var isDeletingAccount = false
+    @State private var presentedLegalDoc: LegalDoc?
 
     private let translations = ["BSB", "WEB", "KJV"]
 
@@ -274,12 +275,33 @@ struct SettingsView: View {
                             .foregroundColor(.coInkTertiary)
                     }
                     CODivider()
+                    legalRow(title: LegalDocuments.termsTitle, doc: .terms)
+                    CODivider()
+                    legalRow(title: LegalDocuments.privacyTitle, doc: .privacy)
+                    CODivider()
                     Text("Crossed Out — Scripture for Real Life")
                         .font(.coUIItalic(13))
                         .foregroundColor(.coInkTertiary)
                 }
             }
         }
+        .sheet(item: $presentedLegalDoc) { LegalDocView(doc: $0) }
+    }
+
+    private func legalRow(title: String, doc: LegalDoc) -> some View {
+        Button {
+            presentedLegalDoc = doc
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.coUI(15))
+                    .foregroundColor(.coInk)
+                Spacer()
+                COIcon(.chevronRight, size: 12, color: .coInkTertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var appVersion: String {

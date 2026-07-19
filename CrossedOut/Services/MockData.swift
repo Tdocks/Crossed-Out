@@ -128,14 +128,6 @@ enum MockData {
                       heartCount: 18)
     ]
 
-    // MARK: - Bridge Share
-
-    static let bridgeShare = BridgeShare(
-        toName: "Jaden",
-        whyText: "This verse reminded me of you because you've been dealing with a lot lately. I'm praying for you.",
-        verse: philippians4
-    )
-
     // MARK: - Attend
 
     static let elevationChurch = Church(

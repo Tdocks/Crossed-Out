@@ -5,6 +5,7 @@ import SwiftUI
 /// user's own "independent study" devotionals. Pushed inside an existing
 /// NavigationStack (from More), so it uses NavigationLinks directly.
 struct DevotionalsHubView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var today: Devotional?
     @State private var mine: [UserDevotional] = []
     @State private var seen: [UUID] = []
@@ -12,12 +13,16 @@ struct DevotionalsHubView: View {
     @State private var rerollingDevo = false
     @State private var showComposer = false
     @State private var showAi = false
+    @State private var reflections: [DevotionalReflection] = []
+    @State private var reflectionsLoading = true
+    @State private var reflectionsFailed = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 todaySection
                 mineSection
+                reflectionsSection
                 Spacer(minLength: 60)
             }
             .padding(.horizontal, 22)
@@ -38,6 +43,7 @@ struct DevotionalsHubView: View {
         }
         .task { await loadToday() }
         .task { await loadMine() }
+        .task { await loadReflections() }
     }
 
     // MARK: Today's built-in devotional
@@ -96,6 +102,12 @@ struct DevotionalsHubView: View {
                     .lineSpacing(5)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+                if let focusLabel = matchedFocusLabel(d) {
+                    Text("Chosen for your focus: \(focusLabel)")
+                        .font(.coUI(11))
+                        .foregroundColor(.coInkTertiary)
+                        .padding(.top, 2)
+                }
                 HStack(spacing: 4) {
                     Text("Read devotional")
                         .font(.coUI(12, weight: .medium))
@@ -105,6 +117,15 @@ struct DevotionalsHubView: View {
                 .padding(.top, 2)
             }
         }
+    }
+
+    /// Quiet "why this one" line: shown only when today's devotional
+    /// genuinely matches one of the user's chosen focus areas (the +30
+    /// boost in the deterministic picker, migration 0026).
+    private func matchedFocusLabel(_ d: Devotional) -> String? {
+        guard let slug = d.focusSlug else { return nil }
+        let label = FocusAreaSlugMap.label(forSlug: slug)
+        return appState.profile.focusAreas.contains(label) ? label : nil
     }
 
     private func affordance(_ icon: COIconName, _ text: String) -> some View {
@@ -194,6 +215,115 @@ struct DevotionalsHubView: View {
                 COIcon(.chevronRight, size: 15, color: .coInkTertiary)
             }
         }
+    }
+
+    // MARK: Archive — past devotionals + private reflections
+
+    /// The user's saved reflections, newest-edited first. Tapping reopens
+    /// the devotional (with the reflection loaded for editing). PRIVACY:
+    /// this list is own-rows RLS data and is never sent to Kyra or any AI.
+    @ViewBuilder
+    private var reflectionsSection: some View {
+        if reflectionsLoading || reflectionsFailed || !reflections.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionLabel("YOUR REFLECTIONS")
+
+                if reflectionsLoading {
+                    COCard {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Loading your reflections…")
+                                .font(.coUI(13))
+                                .foregroundColor(.coInkTertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else if reflectionsFailed {
+                    COCard {
+                        HStack {
+                            Text("Couldn't load your reflections.")
+                                .font(.coUI(13))
+                                .foregroundColor(.coInkSecondary)
+                            Spacer()
+                            Button {
+                                reflectionsLoading = true
+                                reflectionsFailed = false
+                                Task { await loadReflections() }
+                            } label: {
+                                Text("Retry")
+                                    .font(.coUI(13, weight: .medium))
+                                    .foregroundColor(.coCrossRed)
+                                    .underline()
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(reflections) { r in
+                            if let d = r.devotional {
+                                NavigationLink {
+                                    DevotionalDetailView(devotional: d, navTitle: "Devotional")
+                                } label: {
+                                    reflectionRow(r, devotional: d)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    Text("Private to you — protected by row-level security, never shared with other users, and never sent to Kyra or any AI.")
+                        .font(.coUI(11))
+                        .foregroundColor(.coInkTertiary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func reflectionRow(_ r: DevotionalReflection, devotional d: Devotional) -> some View {
+        COCard {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(d.title)
+                        .font(.coUI(15, weight: .semibold))
+                        .foregroundColor(.coInk)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(displayDate(r.reflectedOn))
+                        .font(.coUI(11))
+                        .foregroundColor(.coInkTertiary)
+                }
+                Text(d.verseRef)
+                    .font(.coUI(12))
+                    .foregroundColor(.coCrossRed)
+                Text(r.body)
+                    .font(.coUIItalic(13))
+                    .foregroundColor(.coInkSecondary)
+                    .lineSpacing(4)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// "2026-07-19" → "Jul 19" (falls back to the raw string).
+    private func displayDate(_ isoDay: String) -> String {
+        let inF = DateFormatter()
+        inF.dateFormat = "yyyy-MM-dd"
+        guard let date = inF.date(from: isoDay) else { return isoDay }
+        let outF = DateFormatter()
+        outF.dateFormat = "MMM d"
+        return outF.string(from: date)
+    }
+
+    private func loadReflections() async {
+        do {
+            reflections = try await SupabaseService.shared.listMyReflections()
+        } catch {
+            reflectionsFailed = true
+        }
+        reflectionsLoading = false
     }
 
     private func sectionLabel(_ text: String) -> some View {

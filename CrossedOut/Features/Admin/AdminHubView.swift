@@ -50,6 +50,27 @@ struct AdminHubView: View {
                 }
                 .buttonStyle(.plain)
 
+                NavigationLink { ModerationQueueView() } label: {
+                    HStack(spacing: 12) {
+                        COIcon(.heart, size: 20, color: .coCrossRed)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Moderation queue")
+                                .font(.coUI(16, weight: .semibold))
+                                .foregroundColor(.coInk)
+                            Text("Review reported community content")
+                                .font(.coUI(12))
+                                .foregroundColor(.coInkSecondary)
+                        }
+                        Spacer()
+                        COIcon(.chevronRight, size: 16, color: .coInkTertiary)
+                    }
+                    .padding(16)
+                    .background(Color.coCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.coDivider, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+
                 inviteSection
                 pendingSection
 

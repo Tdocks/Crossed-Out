@@ -14,6 +14,11 @@ struct RootView: View {
                 // a stale/missing session at launch). There is no anonymous
                 // fallback, so this gate is mandatory and non-dismissible.
                 AuthGateView()
+            } else if appState.needsLegalAcceptance {
+                // Signed in, but hasn't accepted the current Terms version
+                // (account predates the consent flow, or the Terms changed).
+                // Non-dismissible; "I Agree" or sign out (migration 0023).
+                LegalAcceptanceGateView()
             } else if appState.isPendingVerification {
                 // A church that self-signed-up in the app. No app access until
                 // a system admin verifies the account (migration 0021).
@@ -153,7 +158,9 @@ struct AuthGateView: View {
         VStack(spacing: 0) {
             Spacer().frame(height: 20)
             AuthSheet(mode: mode) { _ in
-                appState.refreshAuthState()
+                // Re-runs bootstrap so remote data AND the Terms-acceptance
+                // check load for the account that just signed in.
+                appState.refreshAfterAuth()
             }
             modeToggle
         }

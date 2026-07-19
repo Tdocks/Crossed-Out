@@ -61,10 +61,156 @@ struct HelpfulFeedbackControl: View {
     }
 }
 
+// MARK: - Private reflection box (built-in devotional detail)
+
+/// A save-able personal reflection tied to one built-in devotional.
+/// One per user per devotional; editing updates it (upsert, migration 0028).
+///
+/// PRIVACY: this text is own-rows RLS data and is NEVER included in any
+/// AI/edge-function payload. A future explicit opt-in could one day let
+/// Kyra reference reflections (see `shared_with_kyra` in 0028) — that
+/// remains OFF and unbuilt by design.
+struct DevotionalReflectionBox: View {
+    let devotionalID: UUID
+
+    @State private var text = ""
+    @State private var savedText = ""
+    @State private var loading = true
+    @State private var loadFailed = false
+    @State private var saving = false
+    @State private var saveFailed = false
+    @State private var justSaved = false
+
+    private var hasUnsavedChanges: Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed != savedText
+    }
+
+    var body: some View {
+        COCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    COIcon(.note, size: 15, color: .coOlive)
+                    Text("YOUR REFLECTION")
+                        .font(.coUI(11, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundColor(.coInkTertiary)
+                    Spacer()
+                    if justSaved {
+                        Text("Saved")
+                            .font(.coUI(11, weight: .medium))
+                            .foregroundColor(.coOlive)
+                            .transition(.opacity)
+                    }
+                }
+
+                if loading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Loading your reflection…")
+                            .font(.coUI(12))
+                            .foregroundColor(.coInkTertiary)
+                    }
+                    .padding(.vertical, 6)
+                } else {
+                    TextEditor(text: $text)
+                        .font(.coUI(14))
+                        .foregroundColor(.coInk)
+                        .lineSpacing(4)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 88)
+                        .overlay(alignment: .topLeading) {
+                            if text.isEmpty {
+                                Text("What is God saying to you through this?")
+                                    .font(.coUIItalic(14))
+                                    .foregroundColor(.coInkTertiary)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+
+                    if loadFailed {
+                        Text("Couldn't load a saved reflection — you can still write and save one.")
+                            .font(.coUI(11))
+                            .foregroundColor(.coInkTertiary)
+                    }
+                    if saveFailed {
+                        Text("Couldn't save. Check your connection and try again.")
+                            .font(.coUI(12))
+                            .foregroundColor(.coCrossRed)
+                    }
+
+                    if hasUnsavedChanges {
+                        Button {
+                            save()
+                        } label: {
+                            Text(saving ? "Saving…" : "Save reflection")
+                                .font(.coUI(13, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .frame(height: 38)
+                                .background(Color.coCrossRed)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(saving)
+                        .transition(.opacity)
+                    }
+                }
+
+                CODivider().padding(.top, 2)
+                Text("Private to you. Reflections are stored under row-level security so only your account can read them — never shared with other users, and never sent to Kyra or any AI.")
+                    .font(.coUI(11))
+                    .foregroundColor(.coInkTertiary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: hasUnsavedChanges)
+        .task { await load() }
+    }
+
+    private func load() async {
+        do {
+            if let existing = try await SupabaseService.shared.fetchMyReflection(devotionalID: devotionalID) {
+                text = existing.body
+                savedText = existing.body
+            }
+        } catch {
+            loadFailed = true
+        }
+        loading = false
+    }
+
+    private func save() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !saving else { return }
+        saving = true
+        saveFailed = false
+        Task {
+            let ok = await SupabaseService.shared.saveReflection(devotionalID: devotionalID, body: trimmed)
+            saving = false
+            if ok {
+                savedText = trimmed
+                withAnimation(.easeOut(duration: 0.2)) { justSaved = true }
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    withAnimation { justSaved = false }
+                }
+            } else {
+                saveFailed = true
+            }
+        }
+    }
+}
+
 // MARK: - Built-in devotional detail
 
 struct DevotionalDetailView: View {
     let devotional: Devotional
+    /// "Today's Devotional" from Today/hub; the archive passes "Devotional".
+    var navTitle: String = "Today's Devotional"
 
     var body: some View {
         ScrollView {
@@ -103,14 +249,21 @@ struct DevotionalDetailView: View {
                     }
                 }
 
+                DevotionalReflectionBox(devotionalID: devotional.id)
+
                 COCard {
                     HelpfulFeedbackControl(source: .builtin, devotionalID: devotional.id)
                 }
             }
-            .padding(22)
+            .padding(.horizontal, 22)
+            .padding(.top, 22)
+            // Generous bottom inset so the last card (the helpful control)
+            // scrolls fully clear of the home indicator / any floating
+            // chrome and stays fully tappable.
+            .padding(.bottom, 100)
         }
         .background(Color.coPaper.ignoresSafeArea())
-        .navigationTitle("Today's Devotional")
+        .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             Task { await SupabaseService.shared.recordCompletion(kind: "devotional") }
@@ -151,7 +304,9 @@ struct UserDevotionalDetailView: View {
                     HelpfulFeedbackControl(source: .independent, userDevotionalID: devotional.id)
                 }
             }
-            .padding(22)
+            .padding(.horizontal, 22)
+            .padding(.top, 22)
+            .padding(.bottom, 100)
         }
         .background(Color.coPaper.ignoresSafeArea())
         .navigationTitle("Devotional")

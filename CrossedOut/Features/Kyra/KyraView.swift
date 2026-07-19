@@ -1,7 +1,14 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Kyra
 
+/// Kyra chat. The conversation is real and persistent (kyra_messages,
+/// migration 0024): history loads on open, every turn is saved, and "New"
+/// starts fresh by deleting the user's rows. Replies come only from the
+/// hardened, retrieval-grounded edge function — there are no canned
+/// responses. A deterministic on-device crisis detector surfaces real help
+/// resources the moment a message suggests danger.
 struct KyraView: View {
     var contextRef: String? = nil
     var contextText: String? = nil
@@ -9,11 +16,21 @@ struct KyraView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
-    @State private var messages: [ChatMessage] = Array(MockData.kyraConversation.prefix(2))
+    @State private var messages: [ChatMessage] = []
     @State private var input: String = ""
     @State private var isReflecting = false
-    @State private var suggestionUsed = false
+    @State private var isLoadingHistory = true
+    @State private var historyLoaded = false
     @State private var hasSentContextPreamble = false
+    @State private var crisisCategory: CrisisCategory?
+    @State private var dailyLimitReached = false
+    @State private var sendFailed = false
+    @State private var showClearConfirm = false
+    /// Kyra's in-progress reply while tokens stream in. Non-nil from the
+    /// first token until the stream completes (then the finished text moves
+    /// into `messages`). Rendered as plain text mid-stream; the markdown
+    /// treatment applies once complete.
+    @State private var streamingText: String?
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -29,6 +46,15 @@ struct KyraView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .hidesTabBar()
+        .task { await loadHistoryIfNeeded() }
+        .confirmationDialog(
+            "Start a fresh conversation? Your current one will be deleted.",
+            isPresented: $showClearConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Start Fresh", role: .destructive) { clearConversation() }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     private func contextChip(_ ref: String) -> some View {
@@ -66,6 +92,19 @@ struct KyraView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
+                if !messages.isEmpty {
+                    Button {
+                        showClearConfirm = true
+                    } label: {
+                        Text("New")
+                            .font(.coUI(14))
+                            .foregroundColor(.coInkSecondary)
+                            .padding(.vertical, 8)
+                            .padding(.leading, 12)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             VStack(spacing: 6) {
                 Text("K")
@@ -89,10 +128,25 @@ struct KyraView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 16) {
+                    if isLoadingHistory {
+                        loadingState
+                    } else if messages.isEmpty {
+                        emptyState
+                    }
                     ForEach(messages) { msg in
                         KyraBubble(message: msg)
                             .id(msg.id)
                             .transition(.opacity.combined(with: .offset(y: 4)))
+                    }
+                    if let crisisCategory {
+                        CrisisResourcesCard(category: crisisCategory)
+                            .id("crisis")
+                            .transition(.opacity)
+                    }
+                    if let streamingText {
+                        KyraLiveBubble(text: streamingText)
+                            .id("streaming")
+                            .transition(.opacity)
                     }
                     if isReflecting {
                         Text("Kyra is reflecting…")
@@ -101,8 +155,11 @@ struct KyraView: View {
                             .padding(.leading, 40)
                             .id("reflecting")
                     }
-                    if showSuggestion {
-                        suggestionCapsule
+                    if sendFailed {
+                        retryRow
+                    }
+                    if dailyLimitReached {
+                        limitCard
                     }
                 }
                 .padding(.horizontal, 20)
@@ -112,25 +169,118 @@ struct KyraView: View {
             .onChange(of: messages.count) { _, _ in
                 withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
             }
+            .onChange(of: streamingText) { _, newValue in
+                // Follow the live bubble as tokens arrive (no animation —
+                // per-token animated scrolls stutter).
+                if newValue != nil { proxy.scrollTo("streaming", anchor: .bottom) }
+            }
+            .onChange(of: crisisCategory != nil) { _, hasCrisis in
+                if hasCrisis {
+                    withAnimation { proxy.scrollTo("crisis", anchor: .bottom) }
+                }
+            }
         }
     }
 
-    private var showSuggestion: Bool {
-        !suggestionUsed && !isReflecting && messages.last?.role == .kyra
+    private var loadingState: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+            Text("Opening your conversation…")
+                .font(.coUI(13))
+                .foregroundColor(.coInkTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 32)
     }
 
-    private var suggestionCapsule: some View {
-        HStack {
-            Spacer()
-            Button { sendSuggestion() } label: {
-                Text("Yes, please.")
-                    .font(.coUI(13))
+    /// First-open (or freshly cleared) state: a warm welcome, honest
+    /// disclaimer, and deterministic starter prompts that send through the
+    /// real Kyra path.
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Hi\(appState.profile.firstName.isEmpty ? "" : ", \(appState.profile.firstName)"). I'm Kyra.")
+                    .font(.coDisplay(22, weight: .semibold))
+                    .foregroundColor(.coInk)
+                Text("I'm here to help you understand Scripture, put words to prayer, and take small faithful steps. Whatever you're carrying, you can say it plainly.")
+                    .font(.coUI(14))
                     .foregroundColor(.coInkSecondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
-                    .overlay(Capsule().strokeBorder(Color.coDivider, lineWidth: 1))
+                    .lineSpacing(5)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(starterPrompts, id: \.self) { prompt in
+                    Button {
+                        send(prompt)
+                    } label: {
+                        Text(prompt)
+                            .font(.coUI(13))
+                            .foregroundColor(.coInk)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color.coCard)
+                            .overlay(Capsule().strokeBorder(Color.coDivider, lineWidth: 1))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text("Kyra offers spiritual encouragement, not professional advice. In a crisis, call or text 988.")
+                .font(.coUI(11))
+                .foregroundColor(.coInkTertiary)
+                .lineSpacing(3)
+        }
+        .padding(.top, 12)
+    }
+
+    private var starterPrompts: [String] {
+        if let contextRef {
+            return [
+                "Help me understand \(contextRef) in my life right now",
+                "Write a prayer from this verse for what I'm carrying",
+                "What would living this verse out look like today?"
+            ]
+        }
+        return [
+            "Write a prayer for what I'm carrying today",
+            "Help me understand a verse I've been reading",
+            "I'm having a hard day"
+        ]
+    }
+
+    private var retryRow: some View {
+        HStack(spacing: 10) {
+            Text("Kyra couldn't respond just now.")
+                .font(.coUI(13))
+                .foregroundColor(.coInkTertiary)
+            Button {
+                withAnimation { sendFailed = false }
+                requestKyraReply()
+            } label: {
+                Text("Try again")
+                    .font(.coUI(13, weight: .medium))
+                    .foregroundColor(.coCrossRed)
+                    .underline()
             }
             .buttonStyle(.plain)
+        }
+        .padding(.leading, 40)
+        .transition(.opacity)
+    }
+
+    private var limitCard: some View {
+        COCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("That's all for today.")
+                    .font(.coUI(14, weight: .semibold))
+                    .foregroundColor(.coInk)
+                Text("You've reached today's conversation limit with Kyra. She'll be here tomorrow. If something can't wait, reach out to a trusted friend, your church family, or a pastor.")
+                    .font(.coUI(13))
+                    .foregroundColor(.coInkSecondary)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .transition(.opacity)
     }
@@ -142,11 +292,13 @@ struct KyraView: View {
             CODivider()
             HStack(spacing: 12) {
                 HStack(spacing: 10) {
-                    TextField("Ask Kyra anything...", text: $input, axis: .vertical)
+                    TextField(dailyLimitReached ? "Kyra will be back tomorrow" : "Ask Kyra anything...",
+                              text: $input, axis: .vertical)
                         .font(.coUI(14))
                         .foregroundColor(.coInk)
                         .lineLimit(1...4)
                         .focused($inputFocused)
+                        .disabled(dailyLimitReached)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -163,75 +315,125 @@ struct KyraView: View {
 
     private var sendButton: some View {
         let empty = input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let blocked = empty || dailyLimitReached || isReflecting || streamingText != nil
         return Button { sendInput() } label: {
-            COIcon(.chevronRight, size: 20, color: empty ? .coInkTertiary : .coCrossRed)
+            COIcon(.chevronRight, size: 20, color: blocked ? .coInkTertiary : .coCrossRed)
                 .frame(width: 40, height: 40)
                 .overlay(Circle().strokeBorder(
-                    empty ? Color.coDivider : Color.coCrossRed, lineWidth: 1))
+                    blocked ? Color.coDivider : Color.coCrossRed, lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .disabled(empty)
+        .disabled(blocked)
+    }
+
+    // MARK: History
+
+    private func loadHistoryIfNeeded() async {
+        guard !historyLoaded else { return }
+        historyLoaded = true
+        defer { withAnimation(.easeOut(duration: 0.2)) { isLoadingHistory = false } }
+        if let history = try? await SupabaseService.shared.fetchKyraHistory() {
+            messages = history
+        }
+        // On failure the conversation simply starts empty — chatting still
+        // works, and history reappears next open once the network is back.
+    }
+
+    private func clearConversation() {
+        Task {
+            let cleared = await SupabaseService.shared.clearKyraHistory()
+            guard cleared else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                messages = []
+                crisisCategory = nil
+                dailyLimitReached = false
+                sendFailed = false
+                streamingText = nil
+                hasSentContextPreamble = false
+            }
+        }
     }
 
     // MARK: Actions
 
-    private func sendSuggestion() {
-        withAnimation(.easeOut(duration: 0.25)) {
-            suggestionUsed = true
-            messages.append(ChatMessage(role: .user, text: "Yes, please."))
-        }
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        reflectThen([
-            ChatMessage(role: .kyra, text: "Father, thank You that Tyler doesn't have to carry the weight of the future alone. Give him wisdom with money, peace in uncertainty, and trust that You are preparing something good. Amen."),
-            ChatMessage(role: .kyra, text: "I'm here whenever you want to reflect again.")
-        ])
-    }
-
     private func sendInput() {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        withAnimation(.easeOut(duration: 0.25)) {
-            messages.append(ChatMessage(role: .user, text: trimmed))
-        }
         input = ""
         inputFocused = true
-        askKyraThen(fallback: [
-            ChatMessage(role: .kyra, text: "That's worth sitting with. Many Christians find that bringing this honestly to God in prayer is the best first step. Would you like a verse that speaks to it?")
-        ])
+        send(trimmed)
     }
 
-    /// Tries the live Kyra edge function first; on ANY failure (not deployed
-    /// yet, network error, bad response, etc.) falls back to the canned
-    /// reply silently and instantly — the user should never see an error.
-    private func askKyraThen(fallback: [ChatMessage]) {
+    private func send(_ text: String) {
+        guard !isReflecting, streamingText == nil, !dailyLimitReached else { return }
+        let userMessage = ChatMessage(role: .user, text: text)
+        withAnimation(.easeOut(duration: 0.25)) {
+            messages.append(userMessage)
+            sendFailed = false
+        }
+        Task { await SupabaseService.shared.saveKyraMessage(userMessage) }
+
+        // Deterministic, on-device crisis check — real resources appear
+        // immediately, before and regardless of the model's reply.
+        if crisisCategory == nil, let category = CrisisDetector.detect(in: text) {
+            withAnimation(.easeOut(duration: 0.25)) { crisisCategory = category }
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+
+        requestKyraReply()
+    }
+
+    /// Calls the live, retrieval-grounded Kyra edge function and streams the
+    /// reply token-by-token into a live bubble. No canned replies: failure
+    /// shows an honest retry row, and the daily cap (returned as a 429
+    /// before the stream ever starts) shows a gentle limit state. The full
+    /// reply is persisted once the stream completes.
+    private func requestKyraReply() {
         withAnimation(.easeOut(duration: 0.25)) { isReflecting = true }
         var history = messages
         if !hasSentContextPreamble, let contextRef, let contextText {
-            history.insert(
-                ChatMessage(role: .user, text: "Context: I am reading \(contextRef): \"\(contextText)\""),
-                at: 0
-            )
+            // Slot the reading context in just before the latest user turn so
+            // the edge function's rolling window (last 12) always keeps it.
+            let preamble = ChatMessage(role: .user, text: "Context: I am reading \(contextRef): \"\(contextText)\"")
+            history.insert(preamble, at: max(0, history.count - 1))
             hasSentContextPreamble = true
         }
         let firstName = appState.profile.firstName
         Task {
-            var replies = fallback
-            if let text = try? await SupabaseService.shared.askKyra(messages: history, firstName: firstName) {
-                replies = [ChatMessage(role: .kyra, text: text)]
-            }
-            withAnimation(.easeOut(duration: 0.3)) {
-                isReflecting = false
-                messages.append(contentsOf: replies)
-            }
-        }
-    }
-
-    private func reflectThen(_ replies: [ChatMessage]) {
-        withAnimation(.easeOut(duration: 0.25)) { isReflecting = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                isReflecting = false
-                messages.append(contentsOf: replies)
+            do {
+                let full = try await SupabaseService.shared.askKyraStreaming(
+                    messages: history,
+                    firstName: firstName
+                ) { delta in
+                    if streamingText == nil {
+                        // First token: swap the "reflecting" indicator for
+                        // the live bubble.
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isReflecting = false
+                            streamingText = ""
+                        }
+                    }
+                    streamingText = (streamingText ?? "") + delta
+                }
+                let reply = ChatMessage(role: .kyra, text: full)
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isReflecting = false
+                    streamingText = nil
+                    messages.append(reply)
+                }
+                await SupabaseService.shared.saveKyraMessage(reply)
+            } catch KyraServiceError.dailyLimitReached {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    isReflecting = false
+                    streamingText = nil
+                    dailyLimitReached = true
+                }
+            } catch {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    isReflecting = false
+                    streamingText = nil
+                    sendFailed = true
+                }
             }
         }
     }
@@ -246,11 +448,10 @@ private struct KyraBubble: View {
         if message.role == .kyra {
             HStack(alignment: .top, spacing: 10) {
                 COAvatar(initials: "K", size: 30)
-                Text(message.text)
-                    .font(.coUI(14.5))
-                    .foregroundColor(.coInk)
-                    .lineSpacing(5)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Completed Kyra messages get the markdown treatment:
+                // emphasis rendered, "> " lines as styled Scripture quotes,
+                // no leaked *, > or # characters.
+                KyraMessageBody(text: message.text)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 11)
                     .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.coCard))
@@ -271,6 +472,35 @@ private struct KyraBubble: View {
                     .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.coPaperSecondary))
                     .frame(maxWidth: 280, alignment: .trailing)
             }
+        }
+    }
+}
+
+// MARK: - Live (streaming) Bubble
+
+/// Kyra's in-progress reply. Rendered as plain text with a soft cursor while
+/// tokens arrive — partial markdown mid-stream would flicker — then replaced
+/// by the fully formatted KyraBubble when the stream completes.
+private struct KyraLiveBubble: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            COAvatar(initials: "K", size: 30)
+            (Text(text.isEmpty ? "" : text)
+                + Text(text.isEmpty ? "▋" : " ▋")
+                    .foregroundColor(.coCrossRed.opacity(0.55)))
+                .font(.coUI(14.5))
+                .foregroundColor(.coInk)
+                .lineSpacing(5)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.coCard))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.coDivider, lineWidth: 1))
+                .frame(maxWidth: 300, alignment: .leading)
+            Spacer(minLength: 20)
         }
     }
 }

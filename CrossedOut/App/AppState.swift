@@ -13,6 +13,12 @@ final class AppState: ObservableObject {
     @Published var checkInMood: Mood?
     @Published var tabBarHidden = false
 
+    /// True when the signed-in user has NOT yet accepted the current Terms
+    /// version (migration 0023). RootView blocks the app behind
+    /// LegalAcceptanceGateView while this is set. Fails open on network
+    /// errors — we never lock a user out because a check couldn't run.
+    @Published var needsLegalAcceptance = false
+
     // MARK: - Role & verification (migration 0021)
     @Published var role: UserRole = .user
     @Published var accountStatus: AccountStatus = .active
@@ -42,9 +48,22 @@ final class AppState: ObservableObject {
     @Published var todayVerseChapter: Int?
     @Published var todayVerseVerse: Int?
 
+    /// The "understand" step: curated pastoral context for today's verse
+    /// (curated_verses.theme_summary via the recommend engine). Nil for an
+    /// AI-tagged verse with no curated row — Today falls back to a
+    /// focus-based line, never a placeholder.
+    @Published var todayVerseContext: String?
+    /// The "act" step: today's deterministic practical action
+    /// (today_practice_action RPC, migration 0025). Nil hides the card.
+    @Published var todayAction: PracticeAction?
+
     @Published var passages: [Passage] = []
     @Published var prayers: [PrayerRequest] = []
     @Published var posts: [CommunityPost] = []
+    /// Community feed load state. The feed NEVER shows mock content — fake
+    /// user posts are worse than an honest empty/error state.
+    @Published var communityLoading = true
+    @Published var communityLoadFailed = false
     @Published var churches: [Church] = []
     @Published var services: [LiveService] = []
     @Published var projects: [GiveProject] = []
@@ -65,6 +84,7 @@ final class AppState: ObservableObject {
         static let role = "co.role"
         static let accountStatus = "co.accountStatus"
         static let churchId = "co.churchId"
+        static let legalAcceptedVersion = "co.legalAcceptedVersion"
     }
 
     // MARK: - Init
@@ -105,8 +125,8 @@ final class AppState: ObservableObject {
         todayEntry = MockData.todayEntry
         streak = MockData.streak
         passages = [MockData.proverbs3BSB, MockData.psalm23, MockData.philippians4]
-        prayers = MockData.prayerRequests
-        posts = MockData.communityPosts
+        // Community intentionally NOT mock-seeded: an empty or honest error
+        // state beats fake user content (see CommunityView's states).
         churches = MockData.churches
         services = MockData.startingSoon + MockData.tomorrowServices
         projects = MockData.giveProjects
@@ -129,6 +149,8 @@ final class AppState: ObservableObject {
                 posts = fetched
                 isSupabaseLive = true
             }
+            communityLoading = false
+            communityLoadFailed = prayersResult == nil && postsResult == nil
             let churchesResult = try? await service.fetchChurches()
             if let fetched = churchesResult, !fetched.isEmpty {
                 churches = fetched
@@ -161,6 +183,8 @@ final class AppState: ObservableObject {
             persistProfile()
 
             guard isAuthenticated else { return }
+
+            await refreshLegalAcceptance()
 
             weekRhythm = (try? await service.fetchWeekCompletions()) ?? [:]
 
@@ -238,6 +262,9 @@ final class AppState: ObservableObject {
             // (e.g. migration 0009 not yet deployed) this silently no-ops
             // and today's existing verse/behavior is left untouched.
             await applyRecommendedVerseIfAvailable(mood: checkInMood?.rawValue)
+
+            // The "act" step: today's deterministic practical action.
+            await refreshTodayAction(mood: checkInMood?.rawValue)
         }
     }
 
@@ -267,6 +294,69 @@ final class AppState: ObservableObject {
         todayVerseBook = recommended.book
         todayVerseChapter = recommended.chapter
         todayVerseVerse = recommended.verse
+        todayVerseContext = recommended.themeSummary
+    }
+
+    /// Loads/refreshes today's deterministic practical action ("one small
+    /// step"). Stable within the day server-side; re-run after a mood
+    /// check-in so a mood-matched practice can win the tiebreak.
+    func refreshTodayAction(mood: String?) async {
+        let slugs = FocusAreaSlugMap.slugs(for: profile.focusAreas)
+        todayAction = await SupabaseService.shared.fetchTodayPracticeAction(
+            focusSlugs: slugs, mood: mood
+        )
+    }
+
+    /// Refreshes the community feed. Used by pull-to-refresh, after
+    /// composing, and after a block (so server-side RLS filtering takes
+    /// effect immediately).
+    func reloadCommunity() async {
+        let service = SupabaseService.shared
+        let prayersResult = try? await service.fetchPrayerRequests()
+        let postsResult = try? await service.fetchCommunityPosts()
+        if let fetched = prayersResult { prayers = fetched }
+        if let fetched = postsResult { posts = fetched }
+        communityLoadFailed = prayersResult == nil && postsResult == nil
+        communityLoading = false
+    }
+
+    // MARK: - Legal acceptance (migration 0023)
+
+    /// Determines whether the signed-in user must accept the current Terms
+    /// version. Local cache wins (and is re-synced to the server in the
+    /// background); otherwise the server record is checked. Network failure
+    /// fails open — the gate only ever shows on a definitive "not accepted".
+    func refreshLegalAcceptance() async {
+        guard isAuthenticated else {
+            needsLegalAcceptance = false
+            return
+        }
+        let current = LegalDocuments.termsVersion
+        if UserDefaults.standard.string(forKey: DefaultsKey.legalAcceptedVersion) == current {
+            // Accepted on this device — make sure the server record exists
+            // (covers an acceptance that happened while offline).
+            Task { await SupabaseService.shared.recordLegalAcceptance(version: current) }
+            needsLegalAcceptance = false
+            return
+        }
+        do {
+            let accepted = try await SupabaseService.shared.hasAcceptedLegal(version: current)
+            if accepted {
+                UserDefaults.standard.set(current, forKey: DefaultsKey.legalAcceptedVersion)
+            }
+            needsLegalAcceptance = !accepted
+        } catch {
+            // Couldn't check (offline, migration not applied yet) — never
+            // lock the user out over that.
+            needsLegalAcceptance = false
+        }
+    }
+
+    /// Called by LegalAcceptanceGateView's "I Agree": records acceptance
+    /// (local cache + idempotent server insert) and clears the gate.
+    func acceptCurrentLegal() {
+        needsLegalAcceptance = false
+        Task { await SupabaseService.shared.recordLegalAcceptance(version: LegalDocuments.termsVersion) }
     }
 
     /// Tier 2 (G19 §9): deterministic re-roll of Today's verse. Penalizes +
@@ -306,6 +396,10 @@ final class AppState: ObservableObject {
         // picked mood. Purely additive — falls back silently if unavailable.
         await applyRecommendedVerseIfAvailable(mood: mood.rawValue)
 
+        // Refresh the practical action too: a mood-matched practice can now
+        // win the deterministic tiebreak.
+        await refreshTodayAction(mood: mood.rawValue)
+
         bumpStreakForCheckInIfNeeded()
 
         Task {
@@ -344,10 +438,11 @@ final class AppState: ObservableObject {
 
     func completeOnboarding(name: String, focus: [String], need: String) async {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNeed = need.trimmingCharacters(in: .whitespacesAndNewlines)
         let newProfile = UserProfile(
             firstName: trimmedName.isEmpty ? "Friend" : trimmedName,
             focusAreas: focus,
-            need: need,
+            need: trimmedNeed.isEmpty ? "I want to grow closer to God." : trimmedNeed,
             translation: MockData.profile.translation,
             dayNumber: currentDayNumber()
         )
@@ -404,6 +499,10 @@ final class AppState: ObservableObject {
     func signOutAndReset() {
         isAuthenticated = false
         clearRoleState()
+        // Legal acceptance is per-account: a different account signing in on
+        // this device must not inherit the previous account's acceptance.
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.legalAcceptedVersion)
+        needsLegalAcceptance = false
         Task {
             await SupabaseService.shared.signOut()
             refreshAuthState()

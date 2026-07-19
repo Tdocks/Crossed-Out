@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 struct CommunityView: View {
-    private let segments = ["My Circle", "Church", "Prayer", "Local"]
+    private let segments = ["My Circle", "Church", "Prayer", "Micro"]
     @EnvironmentObject private var appState: AppState
     @State private var selectedSegment: String = "My Circle"
     @Namespace private var segmentAnimation
@@ -29,14 +29,23 @@ struct CommunityView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         segmentRow
-                        segmentContent
+                        if appState.communityLoading {
+                            feedLoadingState
+                        } else if appState.communityLoadFailed && appState.prayers.isEmpty && appState.posts.isEmpty {
+                            feedErrorState
+                        } else {
+                            segmentContent
+                        }
                     }
                     .padding(.horizontal, 22)
                     .padding(.top, 12)
                     .padding(.bottom, 90)
                 }
+                .refreshable { await appState.reloadCommunity() }
 
-                fab
+                if appState.accountStatus == .active {
+                    fab
+                }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(isPresented: $showNewPost) { PrayerRequestComposerSheet() }
@@ -44,6 +53,43 @@ struct CommunityView: View {
                 if let fetched = try? await SupabaseService.shared.fetchBlockedAuthors() {
                     blockedAuthors = fetched
                 }
+            }
+        }
+    }
+
+    // MARK: - Feed load / error states
+
+    private var feedLoadingState: some View {
+        COCard {
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("Gathering your community…")
+                    .font(.coUI(13))
+                    .foregroundColor(.coInkTertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var feedErrorState: some View {
+        COCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Couldn't reach the community right now.")
+                    .font(.coUI(14, weight: .medium))
+                    .foregroundColor(.coInk)
+                Text("Check your connection and try again.")
+                    .font(.coUI(13))
+                    .foregroundColor(.coInkSecondary)
+                Button {
+                    Task { await appState.reloadCommunity() }
+                } label: {
+                    Text("Try again")
+                        .font(.coUI(13, weight: .medium))
+                        .foregroundColor(.coCrossRed)
+                        .underline()
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -64,17 +110,21 @@ struct CommunityView: View {
         }
     }
 
-    private func block(authorName: String) {
+    private func block(authorName: String, userID: UUID?) {
         withAnimation(.easeOut(duration: 0.25)) {
             _ = blockedAuthors.insert(authorName)
         }
         Task {
-            await SupabaseService.shared.blockAuthor(name: authorName, userID: nil)
+            await SupabaseService.shared.blockAuthor(name: authorName, userID: userID)
+            // Server-side RLS now filters this author's content (0029) —
+            // refetch so the durable filtering takes over from the local set.
+            await appState.reloadCommunity()
         }
     }
 
     @ViewBuilder
-    private func reportBlockMenu(contentKind: String, contentID: UUID, authorName: String) -> some View {
+    private func reportBlockMenu(contentKind: String, contentID: UUID,
+                                 authorName: String, authorUserID: UUID?) -> some View {
         Menu {
             Button("Spam") { reportContent(kind: contentKind, contentID: contentID, reason: "Spam") }
             Button("Harmful or abusive") { reportContent(kind: contentKind, contentID: contentID, reason: "Harmful or abusive") }
@@ -84,7 +134,7 @@ struct CommunityView: View {
             Label("Report Content", systemImage: "flag")
         }
         Button(role: .destructive) {
-            block(authorName: authorName)
+            block(authorName: authorName, userID: authorUserID)
         } label: {
             Label("Block \(authorName)", systemImage: "person.slash")
         }
@@ -127,7 +177,7 @@ struct CommunityView: View {
         switch selectedSegment {
         case "Church": churchContent
         case "Prayer": prayerContent
-        case "Local": localContent
+        case "Micro": MicroSegmentView()
         default: myCircleContent
         }
     }
@@ -198,50 +248,6 @@ struct CommunityView: View {
         }
     }
 
-    private var localContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            COSectionHeader(title: "Local")
-            Text("Churches near you")
-                .font(.coUI(12))
-                .foregroundColor(.coInkTertiary)
-            if appState.churches.isEmpty {
-                COEmptyState(
-                    icon: .mapPin,
-                    title: "No churches nearby",
-                    message: "We couldn't find churches near you yet."
-                )
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(appState.churches.enumerated()), id: \.element.id) { index, church in
-                        localChurchRow(church)
-                        if index < appState.churches.count - 1 {
-                            CODivider()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func localChurchRow(_ church: Church) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(church.name)
-                    .font(.coUI(15, weight: .medium))
-                    .foregroundColor(.coInk)
-                Text("\(church.city) · \(church.style)")
-                    .font(.coUI(12))
-                    .foregroundColor(.coInkTertiary)
-            }
-            Spacer()
-            Text(String(format: "%.1f mi", church.distanceMiles))
-                .font(.coUI(12))
-                .foregroundColor(.coInkSecondary)
-        }
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-    }
-
     private func prayerCard(_ request: PrayerRequest) -> some View {
         let isPrayed = prayedIDs.contains(request.id)
         return COCard {
@@ -280,7 +286,7 @@ struct CommunityView: View {
                     }
                 }
                 if justReportedIDs.contains(request.id) {
-                    Text("Reported — thank you.")
+                    Text("Reported — thank you. Our team reviews reports within 24 hours.")
                         .font(.coUI(12))
                         .foregroundColor(.coInkTertiary)
                         .transition(.opacity)
@@ -288,7 +294,8 @@ struct CommunityView: View {
             }
         }
         .contextMenu {
-            reportBlockMenu(contentKind: "prayer_request", contentID: request.id, authorName: request.authorName)
+            reportBlockMenu(contentKind: "prayer_request", contentID: request.id,
+                            authorName: request.authorName, authorUserID: request.authorUserId)
         }
     }
 
@@ -326,7 +333,7 @@ struct CommunityView: View {
                 HStack(spacing: 10) {
                     COAvatar(initials: initials(for: post.authorName))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(post.authorName) shared a verse — \(post.verseRef ?? "")")
+                        Text(postHeadline(post))
                             .font(.coUI(14, weight: .semibold))
                             .foregroundColor(.coInk)
                         Text(post.timeAgo)
@@ -334,14 +341,23 @@ struct CommunityView: View {
                             .foregroundColor(.coInkTertiary)
                     }
                 }
-                HStack(alignment: .top, spacing: 12) {
-                    Rectangle()
-                        .fill(Color.coGold)
-                        .frame(width: 2)
-                    Text(post.verseText ?? "")
-                        .font(.coScripture(17, italic: true))
+                if post.kind == .testimony || (post.verseText == nil && !post.text.isEmpty) {
+                    Text(post.text)
+                        .font(.coUI(15))
                         .foregroundColor(.coInk)
-                        .lineSpacing(6)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let verseText = post.verseText, !verseText.isEmpty {
+                    HStack(alignment: .top, spacing: 12) {
+                        Rectangle()
+                            .fill(Color.coGold)
+                            .frame(width: 2)
+                        Text(verseText)
+                            .font(.coScripture(17, italic: true))
+                            .foregroundColor(.coInk)
+                            .lineSpacing(6)
+                    }
                 }
                 HStack(spacing: 16) {
                     encourageHeart(for: post, isEncouraged: isEncouraged)
@@ -355,7 +371,7 @@ struct CommunityView: View {
                     }
                 }
                 if justReportedIDs.contains(post.id) {
-                    Text("Reported — thank you.")
+                    Text("Reported — thank you. Our team reviews reports within 24 hours.")
                         .font(.coUI(12))
                         .foregroundColor(.coInkTertiary)
                         .transition(.opacity)
@@ -363,7 +379,22 @@ struct CommunityView: View {
             }
         }
         .contextMenu {
-            reportBlockMenu(contentKind: "community_post", contentID: post.id, authorName: post.authorName)
+            reportBlockMenu(contentKind: "community_post", contentID: post.id,
+                            authorName: post.authorName, authorUserID: post.authorUserId)
+        }
+    }
+
+    private func postHeadline(_ post: CommunityPost) -> String {
+        switch post.kind {
+        case .verseShare:
+            if let ref = post.verseRef, !ref.isEmpty {
+                return "\(post.authorName) shared a verse — \(ref)"
+            }
+            return "\(post.authorName) shared a verse"
+        case .testimony:
+            return "\(post.authorName) shared a testimony"
+        case .prayer:
+            return post.authorName
         }
     }
 
@@ -426,21 +457,40 @@ private struct PlusShape: Shape {
 private struct PrayerRequestComposerSheet: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+
+    private enum ComposeKind: String, CaseIterable {
+        case prayer = "Prayer request"
+        case testimony = "Testimony"
+    }
+
+    @State private var kind: ComposeKind = .prayer
     @State private var text = ""
+    @State private var isPosting = false
+    @State private var postFailed = false
 
     private var isEmpty: Bool {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var placeholder: String {
+        switch kind {
+        case .prayer: return "Share what you'd like prayer for..."
+        case .testimony: return "Share what God has done..."
+        }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("PRAYER REQUEST")
-                    .font(.coUI(12, weight: .semibold))
-                    .tracking(1.2)
-                    .foregroundColor(.coInkTertiary)
+                HStack(spacing: 10) {
+                    ForEach(ComposeKind.allCases, id: \.self) { option in
+                        COChip(text: option.rawValue, selected: kind == option) {
+                            withAnimation(.easeOut(duration: 0.15)) { kind = option }
+                        }
+                    }
+                }
 
-                TextField("Share what you'd like prayer for...", text: $text, axis: .vertical)
+                TextField(placeholder, text: $text, axis: .vertical)
                     .font(.coUI(15))
                     .foregroundColor(.coInk)
                     .lineLimit(5...12)
@@ -453,15 +503,21 @@ private struct PrayerRequestComposerSheet: View {
                             .strokeBorder(Color.coDivider, lineWidth: 1)
                     )
 
+                if postFailed {
+                    Text("Couldn't post right now. Check your connection and try again.")
+                        .font(.coUI(13))
+                        .foregroundColor(.coCrossRed)
+                }
+
                 Spacer()
 
-                COPrimaryButton(title: "Share Request") { share() }
-                    .opacity(isEmpty ? 0.5 : 1)
-                    .disabled(isEmpty)
+                COPrimaryButton(title: isPosting ? "Sharing…" : shareTitle) { share() }
+                    .opacity(isEmpty || isPosting ? 0.5 : 1)
+                    .disabled(isEmpty || isPosting)
             }
             .padding(20)
             .background(Color.coPaper.ignoresSafeArea())
-            .navigationTitle("New Prayer Request")
+            .navigationTitle(kind == .prayer ? "New Prayer Request" : "Share a Testimony")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -471,16 +527,37 @@ private struct PrayerRequestComposerSheet: View {
         }
     }
 
+    private var shareTitle: String {
+        kind == .prayer ? "Share Request" : "Share Testimony"
+    }
+
     private func share() {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty else { return }
+        guard !body.isEmpty, !isPosting else { return }
+        isPosting = true
+        postFailed = false
         let authorName = appState.profile.firstName
-        let newRequest = PrayerRequest(authorName: authorName, timeAgo: "Just now", text: body, prayedCount: 0)
-        appState.prayers.insert(newRequest, at: 0)
+        let composeKind = kind
         Task {
-            await SupabaseService.shared.insertPrayerRequest(authorName: authorName, body: body)
+            switch composeKind {
+            case .prayer:
+                await SupabaseService.shared.insertPrayerRequest(authorName: authorName, body: body)
+                await appState.reloadCommunity()
+                isPosting = false
+                dismiss()
+            case .testimony:
+                let ok = await SupabaseService.shared.insertCommunityPost(
+                    authorName: authorName, kind: "testimony", body: body
+                )
+                isPosting = false
+                if ok {
+                    await appState.reloadCommunity()
+                    dismiss()
+                } else {
+                    postFailed = true
+                }
+            }
         }
-        dismiss()
     }
 }
 

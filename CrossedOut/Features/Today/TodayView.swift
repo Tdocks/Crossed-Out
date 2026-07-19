@@ -7,18 +7,28 @@ struct TodayView: View {
     @EnvironmentObject private var appState: AppState
     @State private var path = NavigationPath()
     @State private var showCheckIn = false
-    @State private var crossedToday = false
+    @State private var crossedToday: Bool = UserDefaults.standard.bool(forKey: TodayView.devoCrossedKey)
     @State private var showPraySheet = false
     @State private var prayedToday: Bool = UserDefaults.standard.bool(forKey: TodayView.prayedTodayKey)
+    @State private var actionDone: Bool = UserDefaults.standard.bool(forKey: TodayView.actionDoneKey)
     @State private var verseFeedbackGiven: String?
     @State private var rerolling = false
     @State private var todayDevotional: Devotional?
+    @State private var devotionalLoading = true
     @StateObject private var speechController = TodaySpeechController()
 
-    private enum TodayRoute: Hashable { case bible, kyra, settings, devotionals }
+    private enum TodayRoute: Hashable { case bible, kyra, settings, devotionals, devotionalDetail }
 
     private static var prayedTodayKey: String {
         "co.prayedToday." + SupabaseService.dayString(Date())
+    }
+
+    private static var actionDoneKey: String {
+        "co.actionDone." + SupabaseService.dayString(Date())
+    }
+
+    private static var devoCrossedKey: String {
+        "co.devoCrossed." + SupabaseService.dayString(Date())
     }
 
     var body: some View {
@@ -30,10 +40,10 @@ struct TodayView: View {
                         offlineBanner
                     }
                     greetingBlock
+                    dailyDevotionalRow
                     verseCard
                     focusCard
-                    crossOutRow
-                    devotionalCard
+                    actionCard
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
@@ -49,13 +59,23 @@ struct TodayView: View {
                     contextText: appState.todayEntry.verse.text
                 )
                 case .settings: SettingsView()
-                case .devotionals: DevotionalsHubView()
+                case .devotionals: DevotionalsHubView().hidesTabBar()
+                case .devotionalDetail:
+                    Group {
+                        if let d = todayDevotional {
+                            DevotionalDetailView(devotional: d)
+                        } else {
+                            DevotionalsHubView()
+                        }
+                    }
+                    .hidesTabBar()
                 }
             }
             .task {
                 if todayDevotional == nil {
                     todayDevotional = await SupabaseService.shared.fetchTodayDevotional()
                 }
+                devotionalLoading = false
             }
         }
         .sheet(isPresented: $showCheckIn) {
@@ -64,7 +84,10 @@ struct TodayView: View {
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showPraySheet) {
-            PrayerSheet {
+            PrayerSheet(text: TodayPrayer.text(
+                focus: appState.profile.focusAreas.first,
+                mood: appState.checkInMood
+            )) {
                 withAnimation { prayedToday = true }
                 UserDefaults.standard.set(true, forKey: TodayView.prayedTodayKey)
                 Task { await SupabaseService.shared.recordCompletion(kind: "prayer") }
@@ -77,7 +100,7 @@ struct TodayView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            COAvatar(initials: "T", size: 40)
+            COAvatar(initials: avatarInitial, size: 40)
             Spacer(minLength: 8)
             Text(dateLine)
                 .font(.coUI(12, weight: .medium))
@@ -91,6 +114,12 @@ struct TodayView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// First letter of the user's real first name (never a mock initial).
+    private var avatarInitial: String {
+        let first = appState.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines).first
+        return first.map(String.init) ?? "•"
     }
 
     private var dateLine: String {
@@ -122,10 +151,10 @@ struct TodayView: View {
 
     private var greetingBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Good morning, \(appState.profile.firstName).")
+            Text("\(timeGreeting), \(appState.profile.firstName).")
                 .font(.coUI(14))
                 .foregroundColor(.coInkSecondary)
-            Text(appState.todayEntry.carryingPrompt)
+            Text("What are you carrying today?")
                 .font(.coDisplay(30, weight: .semibold))
                 .foregroundColor(.coInk)
                 .lineSpacing(4)
@@ -152,10 +181,21 @@ struct TodayView: View {
         }
     }
 
-    /// The user's actual onboarding answer, falling back to the mock
-    /// today-entry need only when the profile hasn't captured one yet.
+    /// Deterministic time-of-day greeting (the old copy said "Good morning"
+    /// all day).
+    private var timeGreeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 0..<12: return "Good morning"
+        case 12..<17: return "Good afternoon"
+        default: return "Good evening"
+        }
+    }
+
+    /// The user's actual onboarding/settings answer. The fallback is the
+    /// same neutral default onboarding writes for an empty answer — never
+    /// mock copy.
     private var displayedNeed: String {
-        appState.profile.need.isEmpty ? appState.todayEntry.userNeed : appState.profile.need
+        appState.profile.need.isEmpty ? "I want to grow closer to God." : appState.profile.need
     }
 
     private func moodChip(_ mood: Mood) -> some View {
@@ -329,7 +369,7 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Today's Focus
+    // MARK: Today's Focus — the "understand" step
 
     private var focusCard: some View {
         COCard {
@@ -340,13 +380,12 @@ struct TodayView: View {
                         .font(.coUI(15, weight: .semibold))
                         .foregroundColor(.coInk)
                     Spacer()
-                    COIcon(.chevronRight, size: 16, color: .coInkTertiary)
                 }
-                Text("Why this verse?")
+                Text("What it means")
                     .font(.coUI(12))
                     .foregroundColor(.coInkTertiary)
                     .padding(.top, 2)
-                Text(focusWhy)
+                Text(contextText)
                     .font(.coUI(13))
                     .foregroundColor(.coInkSecondary)
                     .lineSpacing(3)
@@ -355,78 +394,134 @@ struct TodayView: View {
         }
     }
 
-    /// The user's primary focus area (from onboarding/settings), falling
-    /// back to the mock today-entry title when none has been chosen yet.
+    /// The user's primary focus area (from onboarding/settings). Falls back
+    /// to plain product copy when none is set yet — never mock data.
     private var focusTitle: String {
-        appState.profile.focusAreas.first ?? appState.todayEntry.focusTitle
+        appState.profile.focusAreas.first ?? "Your journey"
     }
 
-    /// Dynamic "why this verse" copy built from the user's actual focus
-    /// area, falling back to the mock copy when no focus area is set.
-    private var focusWhy: String {
-        guard let focus = appState.profile.focusAreas.first else {
-            return appState.todayEntry.focusWhy
+    /// The understand step: curated pastoral context for today's verse
+    /// (curated_verses.theme_summary via the recommend engine). For an
+    /// AI-tagged verse with no curated row, falls back to a deterministic
+    /// focus-based line.
+    private var contextText: String {
+        if let context = appState.todayVerseContext, !context.isEmpty {
+            return context
         }
-        return "You've been focusing on \(focus.lowercased()) and trusting God's plan."
-    }
-
-    // MARK: Cross Out Row
-
-    private var crossOutRow: some View {
-        Button {
-            withAnimation { crossedToday.toggle() }
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-            if crossedToday {
-                Task { await SupabaseService.shared.recordCompletion(kind: "devotional") }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                COIcon(crossedToday ? .checkCircle : .crossOut, size: 18,
-                       color: crossedToday ? .coCrossRed : .coInkSecondary)
-                CrossOutText("Cross off today's devotional", crossed: crossedToday)
-                Spacer()
-            }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
+        if let focus = appState.profile.focusAreas.first {
+            return "This verse was chosen for where you are — \(focus.lowercased()). Read it slowly and let one phrase stay with you today."
         }
-        .buttonStyle(.plain)
+        return "Read it slowly, twice, and let one phrase stay with you today."
     }
 
-    // MARK: Today's Devotional (entry into the Devotionals hub)
+    // MARK: One Small Step — the "act" step
 
-    private var devotionalCard: some View {
-        Button { path.append(TodayRoute.devotionals) } label: {
+    /// Today's deterministic practical action (today_practice_action RPC,
+    /// migration 0025). Hidden entirely when unavailable (signed out,
+    /// offline before first load, migration not applied) — no placeholder.
+    @ViewBuilder
+    private var actionCard: some View {
+        if let action = appState.todayAction {
             COCard {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
-                        COIcon(.journal, size: 16, color: .coOlive)
-                        Text("TODAY'S DEVOTIONAL")
-                            .font(.coUI(11, weight: .medium)).tracking(1.2)
+                        COIcon(.checkCircle, size: 16, color: .coOlive)
+                        Text("ONE SMALL STEP")
+                            .font(.coUI(11, weight: .semibold))
+                            .tracking(1.6)
                             .foregroundColor(.coInkTertiary)
+                        Spacer()
+                    }
+                    Text(action.body)
+                        .font(.coUI(15))
+                        .foregroundColor(.coInk)
+                        .lineSpacing(5)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        guard !actionDone else { return }
+                        withAnimation(.easeOut(duration: 0.35)) { actionDone = true }
+                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                        UserDefaults.standard.set(true, forKey: TodayView.actionDoneKey)
+                        Task { await SupabaseService.shared.recordCompletion(kind: "action") }
+                    } label: {
+                        HStack(spacing: 8) {
+                            COIcon(actionDone ? .checkCircle : .crossOut, size: 15,
+                                   color: actionDone ? .coCrossRed : .coInkSecondary)
+                            CrossOutText("I did this", crossed: actionDone, size: 13)
+                            if actionDone {
+                                Text("Well walked.")
+                                    .font(.coUI(12))
+                                    .foregroundColor(.coInkTertiary)
+                                    .transition(.opacity)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
+                }
+            }
+        }
+    }
+
+    // MARK: Daily Devotional (thin row at the top of the stack)
+
+    /// Compact single-row entry to the daily devotional, pinned above the
+    /// verse of the day. Tap opens the full devotional; the leading circle
+    /// is the cross-off (records daily_completions kind='devotional',
+    /// persisted per day). Replaces the old mid-stack card + cross-off row.
+    private var dailyDevotionalRow: some View {
+        COCard(padding: 12) {
+            HStack(spacing: 12) {
+                Button {
+                    toggleDevotionalCrossed()
+                } label: {
+                    COIcon(crossedToday ? .checkCircle : .crossOut, size: 20,
+                           color: crossedToday ? .coCrossRed : .coInkSecondary)
+                        .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    path.append(todayDevotional != nil ? TodayRoute.devotionalDetail : TodayRoute.devotionals)
+                } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("DAILY DEVOTIONAL")
+                                .font(.coUI(10, weight: .semibold))
+                                .tracking(1.4)
+                                .foregroundColor(.coInkTertiary)
+                            if let d = todayDevotional {
+                                CrossOutText(d.title, crossed: crossedToday, size: 14)
+                                    .lineLimit(1)
+                            } else if devotionalLoading {
+                                Text("Preparing today's…")
+                                    .font(.coUI(14))
+                                    .foregroundColor(.coInkTertiary)
+                            } else {
+                                Text("Open devotionals")
+                                    .font(.coUI(14))
+                                    .foregroundColor(.coInkSecondary)
+                            }
+                        }
                         Spacer()
                         COIcon(.chevronRight, size: 14, color: .coInkTertiary)
                     }
-                    if let d = todayDevotional {
-                        Text(d.title)
-                            .font(.coDisplay(18, weight: .semibold))
-                            .foregroundColor(.coInk)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(d.verseRef)
-                            .font(.coUI(12, weight: .medium))
-                            .foregroundColor(.coCrossRed)
-                    } else {
-                        Text("Read today's devotional, log your own study, or ask Kyra for a suggestion.")
-                            .font(.coUI(13))
-                            .foregroundColor(.coInkSecondary)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .buttonStyle(.plain)
             }
         }
-        .buttonStyle(.plain)
+    }
+
+    private func toggleDevotionalCrossed() {
+        withAnimation { crossedToday.toggle() }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        UserDefaults.standard.set(crossedToday, forKey: TodayView.devoCrossedKey)
+        if crossedToday {
+            Task { await SupabaseService.shared.recordCompletion(kind: "devotional") }
+        }
     }
 }
 
@@ -467,8 +562,43 @@ private struct CheckInSheet: View {
 
 // MARK: - Prayer Sheet
 
+/// Deterministic daily prayer, composed from today's mood + the user's
+/// primary focus area. Plain templates, no AI — replaces the old hardcoded
+/// mock prayer.
+private enum TodayPrayer {
+    static func text(focus: String?, mood: Mood?) -> String {
+        var lines: [String] = [opening(for: mood)]
+        if let focus, !focus.isEmpty {
+            lines.append("Meet me today in \(focus.lowercased()). Give me wisdom for the next small step, and the trust to leave what I can't control with You.")
+        } else {
+            lines.append("Give me wisdom for the next small step, and the trust to leave what I can't control with You.")
+        }
+        lines.append("Not by my strength, but Yours. Amen.")
+        return lines.joined(separator: " ")
+    }
+
+    private static func opening(for mood: Mood?) -> String {
+        switch mood {
+        case .peaceful: return "Father, thank You for the quiet You've given me today."
+        case .anxious: return "Father, You see the worry I'm carrying today."
+        case .discouraged: return "Father, today feels heavy, and my hope is running thin."
+        case .motivated: return "Father, thank You for the energy You've given me today — help me spend it well."
+        case .angry: return "Father, something in me is burning today. Cool it with Your patience."
+        case .lonely: return "Father, I feel alone today — remind me that You are near."
+        case .confused: return "Father, I can't see the way clearly today."
+        case .grateful: return "Father, my heart is full today — thank You."
+        case .tempted: return "Father, You know what's pulling at me today. Be my strength."
+        case .overwhelmed: return "Father, there is more in front of me today than I can hold."
+        case .hopeful: return "Father, thank You for the hope stirring in me today."
+        case .grieving: return "Father, You see my grief, and You keep count of every tear."
+        case nil: return "Father, thank You for being with me right here, right now."
+        }
+    }
+}
+
 private struct PrayerSheet: View {
     @Environment(\.dismiss) private var dismiss
+    let text: String
     let onAmen: () -> Void
 
     var body: some View {
@@ -477,7 +607,7 @@ private struct PrayerSheet: View {
                 .font(.coUI(11, weight: .semibold))
                 .tracking(1.6)
                 .foregroundColor(.coInkTertiary)
-            Text("Father, thank You that I don't have to carry the weight of my future alone. Give me wisdom in my decisions, peace in uncertainty, and trust that You are preparing something good. Amen.")
+            Text(text)
                 .font(.coScripture(18, italic: true))
                 .foregroundColor(.coInk)
                 .lineSpacing(7)
