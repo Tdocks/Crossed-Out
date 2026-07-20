@@ -155,22 +155,24 @@ struct ChurchFinderView: View {
                 .buttonStyle(.plain)
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(radiusOptions, id: \.self) { r in
-                        COChip(text: "\(Int(r)) mi", selected: radiusMiles == r) {
-                            guard radiusMiles != r else { return }
-                            radiusMiles = r
-                            if let c = lastCenter { Task { await runSearch(center: c) } }
+            HStack(spacing: 10) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(radiusOptions, id: \.self) { r in
+                            COChip(text: "\(Int(r)) mi", selected: radiusMiles == r) {
+                                guard radiusMiles != r else { return }
+                                radiusMiles = r
+                                if let c = lastCenter { Task { await runSearch(center: c) } }
+                            }
                         }
                     }
-                    Spacer(minLength: 0)
-                    Picker("", selection: $mode) {
-                        ForEach(FinderMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 130)
                 }
+                Picker("", selection: $mode) {
+                    ForEach(FinderMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+                .fixedSize()
             }
         }
         .padding(.horizontal, 20)

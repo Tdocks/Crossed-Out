@@ -353,6 +353,18 @@ struct KyraView: View {
         guard !historyLoaded else { return }
         historyLoaded = true
         defer { withAnimation(.easeOut(duration: 0.2)) { isLoadingHistory = false } }
+        #if DEBUG
+        // Screenshot/QA harness: seed a completed Kyra reply so the
+        // "Report this response" affordance is reachable without a network
+        // session (launched via CO_SEED=kyra). Never runs in release builds.
+        if ProcessInfo.processInfo.environment["CO_SEED"]?.contains("kyra") == true {
+            messages = [
+                ChatMessage(role: .user, text: "I've been anxious about money lately."),
+                ChatMessage(role: .kyra, text: "That weight is real, and you're not carrying it alone. In Philippians 4, Paul invites us to bring every worry to God in prayer — and promises a peace that guards the heart. Would it help to write a short prayer together, or look at what Scripture says about God's provision?")
+            ]
+            return
+        }
+        #endif
         if let history = try? await SupabaseService.shared.fetchKyraHistory() {
             messages = history
         }

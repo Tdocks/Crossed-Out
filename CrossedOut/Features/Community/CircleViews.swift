@@ -48,6 +48,17 @@ struct CircleSegmentView: View {
     }
 
     private func reload() async {
+        #if DEBUG
+        // Screenshot/QA harness: seed a circle so the leave-circle
+        // confirmation flow is reachable without a network session
+        // (launched via CO_SEED=circle). Never runs in release builds.
+        if ProcessInfo.processInfo.environment["CO_SEED"]?.contains("circle") == true {
+            circles = [PrayerCircle(id: UUID(), name: "Men's Tuesday Group", joinCode: "AB12CD", memberCount: 4)]
+            loadFailed = false
+            loading = false
+            return
+        }
+        #endif
         do {
             circles = try await SupabaseService.shared.fetchMyCircles()
             loadFailed = false
