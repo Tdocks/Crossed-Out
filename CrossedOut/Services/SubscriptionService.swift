@@ -56,9 +56,7 @@ final class SubscriptionService: ObservableObject {
 
     func refreshEntitlements() async {
         var entitled = false
-        var bestProduct: String?
-        var expires: Date?
-        var originalID: String?
+        var bestJWS: String?
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let tx) = result else { continue }
@@ -66,21 +64,25 @@ final class SubscriptionService: ObservableObject {
             if tx.revocationDate != nil { continue }
             if let exp = tx.expirationDate, exp < Date() { continue }
             entitled = true
-            bestProduct = tx.productID
-            expires = tx.expirationDate
-            originalID = String(tx.originalID)
+            // `result.jwsRepresentation` is the raw StoreKit 2 signed
+            // transaction (JWS) for THIS verification result — the same
+            // string Apple's servers can independently verify. This, not
+            // any locally-read field, is what we hand the server.
+            bestJWS = result.jwsRepresentation
         }
 
+        // Optimistic local UI state from StoreKit's own on-device
+        // verification (fast, but not server-authoritative).
         isPlus = entitled
         recomputePlus()
 
-        if entitled, let bestProduct {
-            await syncToSupabase(
-                productID: bestProduct,
-                status: "active",
-                expiresAt: expires,
-                originalTransactionID: originalID
-            )
+        if let bestJWS {
+            // Authoritative: the edge function re-verifies this JWS's
+            // signature server-side (Apple root-CA chain) and writes
+            // `subscriptions` from ITS decoded payload, never from any
+            // client-supplied product/status/expiry. Overwrites `isPlus`
+            // with the server's resolved entitlement once it responds.
+            await verifyWithServer(signedTransaction: bestJWS)
         } else if !entitled {
             // Don't wipe server row on transient StoreKit failures — only
             // mark expired when we positively know there is no entitlement.
@@ -144,48 +146,69 @@ final class SubscriptionService: ObservableObject {
         objectWillChange.send()
     }
 
-    private func syncToSupabase(
-        productID: String,
-        status: String,
-        expiresAt: Date?,
-        originalTransactionID: String?
-    ) async {
-        struct Params: Encodable {
-            let p_product_id: String
-            let p_status: String
-            let p_expires_at: String?
-            let p_original_transaction_id: String?
-            let p_environment: String?
+    // MARK: - Server-authoritative verification (edge function)
+
+    private struct VerifySubscriptionRequestBody: Encodable {
+        let signedTransaction: String
+    }
+
+    private struct VerifySubscriptionResponse: Decodable {
+        let isPlus: Bool
+        let status: String
+        let productId: String?
+        let expiresAt: String?
+    }
+
+    private struct VerifySubscriptionErrorBody: Decodable {
+        let error: String?
+    }
+
+    /// Hands a StoreKit 2 signed transaction (JWS) to the `verify_subscription`
+    /// edge function, which independently re-verifies its signature against
+    /// Apple's root CA server-side and writes `public.subscriptions` from the
+    /// VERIFIED payload — the client can no longer self-grant entitlement
+    /// (see migration 0044, which revoked client execute on the old
+    /// `upsert_own_subscription` RPC). Updates `isPlus` from the server's
+    /// response, which is authoritative over the optimistic on-device value.
+    private func verifyWithServer(signedTransaction: String) async {
+        guard let session = SupabaseService.shared.client.auth.currentSession else {
+            // No signed-in Supabase session yet (e.g. app launch race) —
+            // local StoreKit entitlement still applies for this run; the
+            // next refreshEntitlements() (post sign-in) will sync it.
+            return
         }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let exp = expiresAt.map { iso.string(from: $0) }
+
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/verify_subscription")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
         do {
-            try await SupabaseService.shared.client
-                .rpc("upsert_own_subscription", params: Params(
-                    p_product_id: productID,
-                    p_status: status,
-                    p_expires_at: exp,
-                    p_original_transaction_id: originalTransactionID,
-                    p_environment: nil
-                ))
-                .execute()
-        } catch {
-            // Fallback without fractional seconds
-            let plain = ISO8601DateFormatter()
-            do {
-                try await SupabaseService.shared.client
-                    .rpc("upsert_own_subscription", params: Params(
-                        p_product_id: productID,
-                        p_status: status,
-                        p_expires_at: expiresAt.map { plain.string(from: $0) },
-                        p_original_transaction_id: originalTransactionID,
-                        p_environment: nil
-                    ))
-                    .execute()
-            } catch {
-                print("SubscriptionService: sync failed: \(error)")
+            request.httpBody = try JSONEncoder().encode(
+                VerifySubscriptionRequestBody(signedTransaction: signedTransaction)
+            )
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                print("SubscriptionService: verify_subscription bad response")
+                return
             }
+            guard (200...299).contains(http.statusCode) else {
+                let detail = (try? JSONDecoder().decode(VerifySubscriptionErrorBody.self, from: data))?.error
+                print("SubscriptionService: verify_subscription failed (\(http.statusCode)): \(detail ?? "-")")
+                return
+            }
+            let decoded = try JSONDecoder().decode(VerifySubscriptionResponse.self, from: data)
+            isPlus = decoded.isPlus
+            recomputePlus()
+        } catch {
+            // Server round-trip failed (offline, timeout, etc). Leave the
+            // optimistic on-device `isPlus` as-is and leave the prior
+            // server-side row untouched — never downgrade entitlement on a
+            // transient network failure.
+            print("SubscriptionService: verify_subscription request failed: \(error)")
         }
     }
 }

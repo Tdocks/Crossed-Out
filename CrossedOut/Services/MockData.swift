@@ -153,11 +153,15 @@ enum MockData {
 
     // MARK: - Give
 
+    // Mirrors the live give_projects row seeded in migration 0045: only
+    // real, verified giving destinations belong here -- no invented URLs,
+    // no fabricated totals. This is what shows before the live fetch
+    // resolves (or if it fails), so it must be just as honest as the DB.
     static let giveProjects: [GiveProject] = [
-        GiveProject(title: "Feed the Homeless", org: "Charlotte, NC",
-                    raised: 4820, goal: 10000, dateRange: nil),
-        GiveProject(title: "Mission Trip to Kenya", org: "Global Missions",
-                    raised: 3150, goal: 5000, dateRange: "Jul 12 – Jul 24")
+        GiveProject(title: "Emmanuel Church", org: "Greenwood, IN",
+                    description: "Give directly to Emmanuel Church's ministries and local outreach through their own secure giving page.",
+                    category: "Local Church", dateRange: nil,
+                    donateURL: "https://www.eclife.org/give")
     ]
 
     // MARK: - Explore

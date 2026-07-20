@@ -323,18 +323,30 @@ extension LiveService {
     }
 }
 
+/// A curated external-giving destination shown on the Give hub. Crossed Out
+/// never handles the funds here -- `donateURL`, when present, is the
+/// organization's own real donation page and is opened in the browser.
+/// There is intentionally no fundraising total: no `raised`/`goal` display,
+/// no donor count. If `donateURL` is nil (or not a valid https link), the
+/// UI must show a disabled "coming soon" state and must NEVER fall back to
+/// a search engine or any other guessed URL.
 struct GiveProject: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     let title: String
     let org: String
-    let raised: Int
-    let goal: Int
+    var description: String? = nil
+    var category: String? = nil
     var dateRange: String?
     var donateURL: String? = nil
 
-    var progress: Double {
-        guard goal > 0 else { return 0 }
-        return min(1.0, Double(raised) / Double(goal))
+    /// True only when there is a real, well-formed https(s) destination to
+    /// send the user to. Anything else must render as "coming soon".
+    var hasRealDonateURL: Bool {
+        guard let donateURL, let url = URL(string: donateURL),
+              let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http" else {
+            return false
+        }
+        return true
     }
 }
 

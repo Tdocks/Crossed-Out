@@ -27,6 +27,9 @@ struct KyraView: View {
     @State private var sendFailed = false
     @State private var showClearConfirm = false
     @State private var showPlusPaywall = false
+    /// Ids of Kyra messages just reported, so the bubble can show a brief
+    /// inline confirmation (mirrors CommunityView's justReportedIDs).
+    @State private var justReportedMessageIDs: Set<UUID> = []
     /// Kyra's in-progress reply while tokens stream in. Non-nil from the
     /// first token until the stream completes (then the finished text moves
     /// into `messages`). Rendered as plain text mid-stream; the markdown
@@ -138,9 +141,13 @@ struct KyraView: View {
                         emptyState
                     }
                     ForEach(messages) { msg in
-                        KyraBubble(message: msg)
-                            .id(msg.id)
-                            .transition(.opacity.combined(with: .offset(y: 4)))
+                        KyraBubble(
+                            message: msg,
+                            isReported: justReportedMessageIDs.contains(msg.id),
+                            onReport: msg.role == .kyra ? { reportKyraMessage(msg) } : nil
+                        )
+                        .id(msg.id)
+                        .transition(.opacity.combined(with: .offset(y: 4)))
                     }
                     if let crisisCategory {
                         CrisisResourcesCard(category: crisisCategory)
@@ -368,6 +375,32 @@ struct KyraView: View {
         }
     }
 
+    // MARK: Report
+
+    /// Reports a completed Kyra reply via the shared content_reports pipeline
+    /// (kind "kyra_message" — see migration 0043). `message.id` is the same
+    /// UUID `saveKyraMessage` used as the kyra_messages row id, so it's a
+    /// stable, already-persisted reference. `reportContent` is best-effort
+    /// and never throws, so this can't crash the chat even if the insert
+    /// fails server-side — the confirmation is optimistic, matching the
+    /// community report affordance.
+    private func reportKyraMessage(_ message: ChatMessage) {
+        Task {
+            await SupabaseService.shared.reportContent(
+                kind: "kyra_message", contentID: message.id,
+                reason: "Harmful or incorrect response", detail: nil
+            )
+        }
+        withAnimation(.easeOut(duration: 0.2)) {
+            _ = justReportedMessageIDs.insert(message.id)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                _ = justReportedMessageIDs.remove(message.id)
+            }
+        }
+    }
+
     // MARK: Actions
 
     private func sendInput() {
@@ -457,21 +490,44 @@ struct KyraView: View {
 
 private struct KyraBubble: View {
     let message: ChatMessage
+    var isReported: Bool = false
+    /// Non-nil only for Kyra's own replies — the user's own messages never
+    /// get a report affordance. Nil while a reply is still streaming, since
+    /// KyraBubble only ever renders completed, persisted messages.
+    var onReport: (() -> Void)? = nil
 
     var body: some View {
         if message.role == .kyra {
             HStack(alignment: .top, spacing: 10) {
                 COAvatar(initials: "K", size: 30)
-                // Completed Kyra messages get the markdown treatment:
-                // emphasis rendered, "> " lines as styled Scripture quotes,
-                // no leaked *, > or # characters.
-                KyraMessageBody(text: message.text)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.coCard))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.coDivider, lineWidth: 1))
-                    .frame(maxWidth: 300, alignment: .leading)
+                VStack(alignment: .leading, spacing: 6) {
+                    // Completed Kyra messages get the markdown treatment:
+                    // emphasis rendered, "> " lines as styled Scripture quotes,
+                    // no leaked *, > or # characters.
+                    KyraMessageBody(text: message.text)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.coCard))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.coDivider, lineWidth: 1))
+                        .frame(maxWidth: 300, alignment: .leading)
+                        .contextMenu {
+                            if let onReport {
+                                Button {
+                                    onReport()
+                                } label: {
+                                    Label("Report this response", systemImage: "flag")
+                                }
+                            }
+                        }
+                    if isReported {
+                        Text("Reported — thank you. We'll review this response.")
+                            .font(.coUI(11))
+                            .foregroundColor(.coInkTertiary)
+                            .padding(.leading, 2)
+                            .transition(.opacity)
+                    }
+                }
                 Spacer(minLength: 20)
             }
         } else {

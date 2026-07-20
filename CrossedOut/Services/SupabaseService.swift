@@ -306,19 +306,19 @@ struct GiveProjectDTO: Codable {
     let id: UUID
     let title: String
     let org: String
-    let raised: Double
-    let goal: Double
+    let description: String?
+    let category: String?
     let dateRange: String?
     let donateURL: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, org, raised, goal
+        case id, title, org, description, category
         case dateRange = "date_range"
         case donateURL = "donate_url"
     }
 
     func toModel() -> GiveProject {
-        GiveProject(id: id, title: title, org: org, raised: Int(raised), goal: Int(goal), dateRange: dateRange, donateURL: donateURL)
+        GiveProject(id: id, title: title, org: org, description: description, category: category, dateRange: dateRange, donateURL: donateURL)
     }
 }
 
@@ -592,10 +592,18 @@ extension SupabaseService {
         }
     }
 
+    /// Fetches active giving destinations for the Give hub. Only
+    /// `is_active = true` rows are returned -- destinations without a
+    /// verified real `donate_url` should be marked inactive in the DB
+    /// rather than shown with an invented link. Ordered so the featured
+    /// anchor destination (lowest `sort_order`) appears first.
     func fetchGiveProjects() async throws -> [GiveProject] {
         let dtos: [GiveProjectDTO] = try await client
             .from("give_projects")
             .select()
+            .eq("is_active", value: true)
+            .order("sort_order", ascending: true)
+            .order("title", ascending: true)
             .execute()
             .value
         return dtos.map { $0.toModel() }
@@ -1433,12 +1441,21 @@ extension SupabaseService {
         let note: String
     }
 
-    /// Best-effort insert of a new note for the current user.
+    /// Best-effort upsert of a note for the current user. Both editing an
+    /// existing note and creating a new one funnel through this same
+    /// UPSERT, keyed on the `user_notes(user_id, book, chapter, verse)`
+    /// unique index. That guarantees exactly one row per verse and
+    /// eliminates the duplicate-row bug that used to crash the reader when
+    /// `Dictionary(uniqueKeysWithValues:)` built a notes map in
+    /// BibleReaderView.
     func saveNote(book: String, chapter: Int, verse: Int, note: String) async {
         guard let uid = currentUserID else { return }
         let payload = NoteInsert(user_id: uid, book: book, chapter: chapter, verse: verse, note: note)
         do {
-            try await client.from("user_notes").insert(payload).execute()
+            try await client
+                .from("user_notes")
+                .upsert(payload, onConflict: "user_id,book,chapter,verse")
+                .execute()
         } catch {
             print("SupabaseService: saveNote failed: \(error)")
         }

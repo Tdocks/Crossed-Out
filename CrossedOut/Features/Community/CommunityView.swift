@@ -15,6 +15,11 @@ struct CommunityView: View {
     @State private var prayerScope: PrayerScope = .everyone
     @State private var scopedPrayers: [PrayerRequest] = []
     @State private var prayerScopeLoading = false
+    // Bumped on every load request so a slow, superseded fetch (from a fast
+    // scope switch) can detect it's stale and skip writing its result —
+    // otherwise it could overwrite scopedPrayers with the wrong scope's data
+    // or leave prayerScopeLoading stuck on.
+    @State private var prayerScopeGeneration = 0
     @State private var myPrimaryChurchID: UUID? = nil
     @State private var churchMembershipIDs: [UUID] = []
 
@@ -112,9 +117,18 @@ struct CommunityView: View {
 
     private func loadScopedPrayers() async {
         guard prayerScope != .everyone else { return }
+        prayerScopeGeneration += 1
+        let generation = prayerScopeGeneration
+        let scope = prayerScope
+        let churchID = myPrimaryChurchID
         prayerScopeLoading = true
-        scopedPrayers = (try? await SupabaseService.shared.fetchPrayerRequests(
-            scope: prayerScope, churchID: myPrimaryChurchID)) ?? []
+        let fetched = (try? await SupabaseService.shared.fetchPrayerRequests(
+            scope: scope, churchID: churchID)) ?? []
+        // A newer scope switch started (and thus bumped the generation)
+        // while this fetch was in flight — its own completion owns
+        // scopedPrayers/prayerScopeLoading now, so don't stomp on it.
+        guard generation == prayerScopeGeneration else { return }
+        scopedPrayers = fetched
         prayerScopeLoading = false
     }
 

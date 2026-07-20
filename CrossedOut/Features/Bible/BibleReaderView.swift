@@ -59,6 +59,22 @@ struct BibleReaderView: View {
     @State private var currentBook: String = "John"
     @State private var currentChapterNum: Int = 14
     @State private var chapterData: BibleChapter = MockData.john14
+    /// True once a fetch has ever returned real chapter content. While this
+    /// is false, `chapterData` is still `MockData.john14` — the bundled
+    /// offline stub — so the reader shows a "limited preview" notice rather
+    /// than silently passing off 4 verses as the whole chapter.
+    @State private var hasFetchedSuccessfully = false
+
+    /// True when the header (`currentBook`/`currentChapterNum`) no longer
+    /// matches the book/chapter `chapterData` actually holds — i.e. a
+    /// chapter switch was requested but the fetch for it failed or came
+    /// back empty, leaving the previous chapter's verses on screen. Real
+    /// scripture under the wrong heading is worse than an honest error, so
+    /// this drives an inline retry state instead of silently keeping the
+    /// stale verses.
+    private var chapterMismatch: Bool {
+        chapterData.book != currentBook || chapterData.chapter != currentChapterNum
+    }
 
     var body: some View {
         Group {
@@ -237,22 +253,62 @@ struct BibleReaderView: View {
     private var readingBody: some View {
         VStack(alignment: .leading, spacing: 18) {
             sectionHeading
-            if let first = chapterData.verses.first {
-                HStack(alignment: .top, spacing: 12) {
-                    Text("\(currentChapterNum)")
-                        .font(.coDisplay(44, weight: .semibold))
-                        .foregroundColor(.coInk)
-                        .fixedSize()
-                    verseParagraph(first)
-                        .id(first.number)
+            if chapterMismatch {
+                chapterErrorState
+            } else {
+                if !hasFetchedSuccessfully {
+                    offlinePreviewBanner
                 }
-                ForEach(Array(chapterData.verses.dropFirst())) { verse in
-                    verseParagraph(verse)
-                        .id(verse.number)
+                if let first = chapterData.verses.first {
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("\(currentChapterNum)")
+                            .font(.coDisplay(44, weight: .semibold))
+                            .foregroundColor(.coInk)
+                            .fixedSize()
+                        verseParagraph(first)
+                            .id(first.number)
+                    }
+                    ForEach(Array(chapterData.verses.dropFirst())) { verse in
+                        verseParagraph(verse)
+                            .id(verse.number)
+                    }
                 }
             }
             chapterNavRow
         }
+    }
+
+    /// Shown in place of stale verses when the currently-selected chapter
+    /// failed to load — see `chapterMismatch`. Mirrors the existing
+    /// "Couldn't load services" / "Try Again" pattern used in AttendView.
+    private var chapterErrorState: some View {
+        COEmptyState(
+            icon: .bible,
+            title: "Couldn't load this chapter",
+            message: "Check your connection and try again.",
+            actionTitle: "Try Again",
+            action: {
+                Task {
+                    await loadChapter(translation: currentTranslation, book: currentBook, chapterNum: currentChapterNum)
+                }
+            }
+        )
+    }
+
+    /// A quiet notice shown when the reader is displaying the bundled
+    /// offline stub (`MockData.john14`) because no fetch has succeeded yet —
+    /// so the user isn't misled into thinking a 4-verse stub is the whole
+    /// chapter.
+    private var offlinePreviewBanner: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color.coInkTertiary)
+                .frame(width: 5, height: 5)
+            Text("Offline — limited preview")
+                .font(.coUI(11, weight: .semibold))
+                .foregroundColor(.coInkTertiary)
+        }
+        .padding(.bottom, 2)
     }
 
     private var chapterNavRow: some View {
@@ -467,14 +523,24 @@ struct BibleReaderView: View {
             translation: translation.rawValue, book: book, chapter: chapterNum
         ), !fetched.verses.isEmpty {
             chapterData = fetched
+            hasFetchedSuccessfully = true
         }
+        // On failure/empty we deliberately leave `chapterData` untouched.
+        // `chapterMismatch` (computed from chapterData vs. currentBook/
+        // currentChapterNum, which the caller already updated) picks up
+        // the resulting desync and swaps the reading body to an inline
+        // retry state instead of showing stale verses under a new heading.
         if let fetchedHighlights = try? await SupabaseService.shared.fetchHighlights(
             book: book, chapter: chapterNum
         ) {
             highlighted = fetchedHighlights
         }
         if let fetchedNotes = try? await SupabaseService.shared.fetchNotes(book: book, chapter: chapterNum) {
-            notes = Dictionary(uniqueKeysWithValues: fetchedNotes.map { ($0.verse, $0) })
+            // `uniquingKeysWith:` rather than `uniqueKeysWithValues:` so a
+            // stray duplicate row (e.g. from a pre-migration insert that
+            // predates the user_notes unique index) can never trap here —
+            // the most recently fetched note for a verse wins.
+            notes = Dictionary(fetchedNotes.map { ($0.verse, $0) }, uniquingKeysWith: { _, latest in latest })
         } else {
             notes = [:]
         }
@@ -534,7 +600,11 @@ struct BibleReaderView: View {
         let chapterNum = currentChapterNum
         await SupabaseService.shared.saveNote(book: book, chapter: chapterNum, verse: verse.number, note: trimmed)
         if let fetchedNotes = try? await SupabaseService.shared.fetchNotes(book: book, chapter: chapterNum) {
-            notes = Dictionary(uniqueKeysWithValues: fetchedNotes.map { ($0.verse, $0) })
+            // `uniquingKeysWith:` rather than `uniqueKeysWithValues:` so a
+            // stray duplicate row (e.g. from a pre-migration insert that
+            // predates the user_notes unique index) can never trap here —
+            // the most recently fetched note for a verse wins.
+            notes = Dictionary(fetchedNotes.map { ($0.verse, $0) }, uniquingKeysWith: { _, latest in latest })
         }
     }
 

@@ -19,6 +19,7 @@ struct CircleSegmentView: View {
     @State private var showJoin = false
     @State private var circlePrayers: [PrayerRequest] = []
     @State private var prayersLoading = false
+    @State private var circleToLeave: PrayerCircle?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -29,6 +30,20 @@ struct CircleSegmentView: View {
         }
         .sheet(isPresented: $showCreate) { CreateCircleSheet { await reload() } }
         .sheet(isPresented: $showJoin) { JoinCircleSheet { await reload() } }
+        .confirmationDialog(
+            "Leave \(circleToLeave?.name ?? "this circle")? You'll need the invite code to rejoin.",
+            isPresented: Binding(
+                get: { circleToLeave != nil },
+                set: { if !$0 { circleToLeave = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Leave Circle", role: .destructive) {
+                if let circle = circleToLeave { leave(circle) }
+                circleToLeave = nil
+            }
+            Button("Cancel", role: .cancel) { circleToLeave = nil }
+        }
         .task { await reload() }
     }
 
@@ -125,7 +140,7 @@ struct CircleSegmentView: View {
             }
         }
         .contextMenu {
-            Button(role: .destructive) { leave(circle) } label: {
+            Button(role: .destructive) { circleToLeave = circle } label: {
                 Label("Leave Circle", systemImage: "rectangle.portrait.and.arrow.right")
             }
         }

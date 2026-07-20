@@ -24,6 +24,12 @@ struct RootView: View {
                 // A church that self-signed-up in the app. No app access until
                 // a system admin verifies the account (migration 0021).
                 PendingVerificationView()
+            } else if appState.accountStatus == .suspended {
+                // Account was suspended following a moderation review. No app
+                // access until a system admin reinstates it — mirrors the
+                // pending-verification gate above rather than reaching
+                // MainTabView.
+                SuspendedAccountView()
             } else {
                 MainTabView()
             }
@@ -228,6 +234,69 @@ struct AuthGateView: View {
                 .foregroundColor(.coInkSecondary)
         }
         .padding(.bottom, 24)
+    }
+}
+
+// MARK: - Suspended Account Gate
+
+/// Full-screen, non-dismissible gate shown when `accountStatus == .suspended`
+/// (e.g. following a moderation review). Structurally mirrors
+/// `PendingVerificationView`, but the tone and outcome are different: there's
+/// no self-serve "you're clear now" wait, just a status recheck (in case a
+/// system admin already reinstated the account) and sign out.
+struct SuspendedAccountView: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var isChecking = false
+
+    var body: some View {
+        ZStack {
+            Color.coPaper.ignoresSafeArea()
+            VStack(spacing: 0) {
+                Spacer()
+
+                COIcon(.mapPin, size: 44, color: .coCrossRed)
+                    .padding(.bottom, 24)
+
+                Text("Your account is paused.")
+                    .font(.coDisplay(26, weight: .semibold))
+                    .foregroundColor(.coInk)
+
+                Text("Access is on hold following a review of your account. If you think this isn't right, reach out to our team and we'll take another look — we want to get this right.")
+                    .font(.coUI(15))
+                    .foregroundColor(.coInkSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 14)
+
+                if let email = SupabaseService.shared.currentUserEmail {
+                    Text(email)
+                        .font(.coUI(13))
+                        .foregroundColor(.coInkTertiary)
+                        .padding(.top, 18)
+                }
+
+                Spacer()
+
+                VStack(spacing: 6) {
+                    COPrimaryButton(title: isChecking ? "Checking…" : "Check status") {
+                        Task {
+                            isChecking = true
+                            await appState.bootstrap()
+                            isChecking = false
+                        }
+                    }
+                    .disabled(isChecking)
+                    .opacity(isChecking ? 0.5 : 1)
+
+                    COSecondaryButton(title: "Sign Out") {
+                        appState.signOutAndReset()
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 28)
+            }
+        }
     }
 }
 

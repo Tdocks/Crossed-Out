@@ -288,6 +288,8 @@ struct MicroDetailView: View {
     @State private var showDeleteMicro = false
     @State private var showLeave = false
     @State private var joining = false
+    @State private var blockedAuthors: Set<String> = []
+    @State private var justReportedPostIDs: Set<UUID> = []
     @FocusState private var composerFocused: Bool
 
     enum AnnounceTTL: String, CaseIterable {
@@ -402,8 +404,9 @@ struct MicroDetailView: View {
 
     // MARK: Pinned + feed
 
-    private var pinnedPosts: [MicroPost] { posts.filter(\.pinned) }
-    private var feedPosts: [MicroPost] { posts.filter { !$0.pinned } }
+    private var visiblePosts: [MicroPost] { posts.filter { !blockedAuthors.contains($0.authorName) } }
+    private var pinnedPosts: [MicroPost] { visiblePosts.filter(\.pinned) }
+    private var feedPosts: [MicroPost] { visiblePosts.filter { !$0.pinned } }
 
     @ViewBuilder
     private var pinnedSection: some View {
@@ -438,6 +441,12 @@ struct MicroDetailView: View {
                         .foregroundColor(.coInk)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
+                    if justReportedPostIDs.contains(post.id) {
+                        Text("Reported — thank you. Our team reviews reports within 24 hours.")
+                            .font(.coUI(12))
+                            .foregroundColor(.coInkTertiary)
+                            .transition(.opacity)
+                    }
                 }
             }
         }
@@ -525,6 +534,12 @@ struct MicroDetailView: View {
                     .foregroundColor(.coInk)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
+                if justReportedPostIDs.contains(post.id) {
+                    Text("Reported — thank you. Our team reviews reports within 24 hours.")
+                        .font(.coUI(12))
+                        .foregroundColor(.coInkTertiary)
+                        .transition(.opacity)
+                }
             }
         }
         .contextMenu { postMenu(post) }
@@ -539,14 +554,16 @@ struct MicroDetailView: View {
             }
         }
         if !mine {
-            Button {
-                Task {
-                    await SupabaseService.shared.reportContent(
-                        kind: "other", contentID: post.id,
-                        reason: "Micro post", detail: nil)
-                }
+            Menu {
+                Button("Spam") { report(post, reason: "Spam") }
+                Button("Harmful or abusive") { report(post, reason: "Harmful or abusive") }
+                Button("Inappropriate") { report(post, reason: "Inappropriate") }
+                Button("Other") { report(post, reason: "Other") }
             } label: {
                 Label("Report Content", systemImage: "flag")
+            }
+            Button(role: .destructive) { block(post) } label: {
+                Label("Block \(post.authorName)", systemImage: "person.slash")
             }
         }
     }
@@ -696,6 +713,34 @@ struct MicroDetailView: View {
             if await SupabaseService.shared.deleteMicroPost(id: post.id) {
                 await loadFeed()
             }
+        }
+    }
+
+    private func report(_ post: MicroPost, reason: String) {
+        Task {
+            await SupabaseService.shared.reportContent(
+                kind: "micro_post", contentID: post.id, reason: reason, detail: nil)
+        }
+        withAnimation(.easeOut(duration: 0.2)) {
+            _ = justReportedPostIDs.insert(post.id)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                _ = justReportedPostIDs.remove(post.id)
+            }
+        }
+    }
+
+    private func block(_ post: MicroPost) {
+        withAnimation(.easeOut(duration: 0.25)) {
+            _ = blockedAuthors.insert(post.authorName)
+        }
+        Task {
+            await SupabaseService.shared.blockAuthor(name: post.authorName, userID: post.authorUserId)
+            // Once migration 0043 lands, micro_posts RLS excludes blocked
+            // authors too — refetch so server-side filtering takes over
+            // from this local set, same as the Community feed's block flow.
+            await loadFeed()
         }
     }
 

@@ -14,6 +14,12 @@ struct FoundChurch: Identifiable {
     let phone: String?
     let url: URL?
     var distanceMeters: CLLocationDistance?
+    /// City/state from the MapKit placemark, kept separate from `address`
+    /// so `matchedStreaming(_:)` can require a location match, not just a
+    /// name match. Curated churches don't carry coordinates, so this is the
+    /// only location signal available for cross-referencing.
+    let locality: String?
+    let administrativeArea: String?
 
     static func from(_ item: MKMapItem, from origin: CLLocation) -> FoundChurch {
         let pm = item.placemark
@@ -25,7 +31,9 @@ struct FoundChurch: Identifiable {
             address: parts.joined(separator: ", "),
             phone: item.phoneNumber,
             url: item.url,
-            distanceMeters: origin.distance(from: dest)
+            distanceMeters: origin.distance(from: dest),
+            locality: pm.locality,
+            administrativeArea: pm.administrativeArea
         )
     }
 
@@ -83,6 +91,17 @@ struct ChurchFinderView: View {
         .onReceive(locationManager.$location) { newValue in
             guard let loc = newValue else { return }
             Task { await runSearch(center: loc.coordinate) }
+        }
+        .onReceive(locationManager.$failureCount) { count in
+            // Fires only when a location request ends WITHOUT a fix (permission
+            // denied/restricted, or a CoreLocation failure) — never on success,
+            // so there's no race with the $location success path above. Without
+            // this, denying the permission prompt left `searching` stuck true
+            // forever with a spinner and no way out.
+            guard count > 0 else { return }
+            searching = false
+            searchError = locationManager.lastFailureMessage
+                ?? "Couldn't get your location. Search a city or ZIP instead."
         }
         .onChange(of: selectedID) { _, newValue in
             if let id = newValue, let church = results.first(where: { $0.id == id }) {
@@ -215,13 +234,74 @@ struct ChurchFinderView: View {
         searching = false
     }
 
-    /// Cross-reference a found church against the curated streaming churches.
+    /// Cross-reference a found church (from MapKit) against the curated
+    /// "streams on Crossed Out" churches, to show the STREAMS badge.
+    ///
+    /// LIMITATION: the `churches` table has no lat/long for curated churches
+    /// (confirmed via `\d churches`), so we can't do a true geo-distance
+    /// match. A prior version matched on name substring alone, which badged
+    /// unrelated local congregations as "streams here" whenever they shared
+    /// a generic name with a curated church (e.g. any nearby "City Church"
+    /// got tagged as the curated Charlotte, NC "City Church"). To eliminate
+    /// false positives we now require BOTH:
+    ///   1. The full church name to match after normalizing (case/punctuation/
+    ///      whitespace-insensitive) — no more substring matching.
+    ///   2. The same city AND state, using MapKit's placemark locality/
+    ///      administrativeArea against the curated church's `city` column,
+    ///      which is stored as "City, ST" (e.g. "Redding, CA").
+    /// A curated church with no parsable "City, ST" (e.g. "Global" for a
+    /// nationwide ministry) simply never matches — conservative by design,
+    /// since there's no location data to safely match on.
     private func matchedStreaming(_ found: FoundChurch) -> Church? {
-        appState.churches.first { curated in
-            found.name.localizedCaseInsensitiveContains(curated.name)
-                || curated.name.localizedCaseInsensitiveContains(found.name)
+        let foundNameKey = Self.normalizedChurchName(found.name)
+        guard let foundCity = found.locality?.trimmingCharacters(in: .whitespacesAndNewlines), !foundCity.isEmpty,
+              let foundStateCode = found.administrativeArea.flatMap(Self.normalizedStateCode) else {
+            return nil
+        }
+        return appState.churches.first { curated in
+            guard Self.normalizedChurchName(curated.name) == foundNameKey else { return false }
+            let parts = curated.city.split(separator: ",", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard parts.count == 2,
+                  let curatedStateCode = Self.normalizedStateCode(parts[1]) else { return false }
+            let curatedCity = parts[0]
+            return curatedCity.caseInsensitiveCompare(foundCity) == .orderedSame
+                && curatedStateCode == foundStateCode
         }
     }
+
+    /// Lowercases and strips everything but letters/digits, so "Life.Church"
+    /// and "Life Church" compare equal without allowing loose substring
+    /// matches (e.g. "City Church" no longer matches "Elevation City Church").
+    private static func normalizedChurchName(_ s: String) -> String {
+        String(s.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) })
+    }
+
+    /// Normalizes a US state to its 2-letter code, accepting either a full
+    /// name ("Indiana") or an abbreviation ("IN"), so curated `city` values
+    /// with inconsistent formatting still compare correctly against MapKit's
+    /// `administrativeArea` (which is normally an abbreviation).
+    private static func normalizedStateCode(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.count == 2 { return trimmed.uppercased() }
+        return usStateAbbreviations[trimmed.lowercased()]
+    }
+
+    private static let usStateAbbreviations: [String: String] = [
+        "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA",
+        "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA",
+        "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
+        "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+        "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS", "missouri": "MO",
+        "montana": "MT", "nebraska": "NE", "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ",
+        "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH",
+        "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
+        "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT",
+        "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
+        "district of columbia": "DC"
+    ]
 
     // MARK: Map mode
 

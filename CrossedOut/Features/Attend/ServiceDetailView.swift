@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import EventKit
+import UserNotifications
 
 // MARK: - Service Detail
 
@@ -124,10 +125,13 @@ private extension ServiceDetailView {
     }
 
     var metaRow: some View {
+        // No star rating here on purpose: `rating` in the churches table is
+        // hand-typed seed data (4.5–5.0 for every entry), not a real review
+        // score. Showing it as "4.7 ★" would present an invented number as
+        // user feedback. See `style` and schedule/viewer info instead — both
+        // are actual data.
         HStack(spacing: 6) {
             Text(service.church.style)
-            Text("·")
-            Text("\(String(format: "%.1f", service.church.rating)) ★")
             Text("·")
             Text(service.isLive ? viewerLabel : service.scheduleLabel)
         }
@@ -231,14 +235,58 @@ private extension ServiceDetailView {
                   let url = URL(string: "https://www.youtube.com/watch?v=\(vid)") {
             // Upcoming broadcast: open its page so the viewer can tap "Notify me".
             openURL(url)
-        } else {
-            // No scheduled video — lightweight reminder confirmation (APNs TBD).
+        } else if let start = service.scheduledStartAt, start.timeIntervalSinceNow > 0 {
+            // We know when this airs but there's no YouTube "Notify me" page
+            // yet — schedule a real local notification instead of just
+            // flashing a confirmation label that persists nothing.
             guard !isPrimaryBusy else { return }
             isPrimaryBusy = true
-            withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "Reminder set." }
+            scheduleLocalReminder(for: start) { granted in
+                withAnimation(.easeOut(duration: 0.2)) {
+                    primaryLabel = granted ? "Reminder set." : "Enable notifications to get reminders"
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                    withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "Set a Reminder" }
+                    isPrimaryBusy = false
+                }
+            }
+        } else {
+            // No stream time announced at all — there's nothing to remind the
+            // user about, so don't claim a reminder was set.
+            guard !isPrimaryBusy else { return }
+            isPrimaryBusy = true
+            withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "We'll show this when a time is announced" }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                 withAnimation(.easeOut(duration: 0.2)) { primaryLabel = "Set a Reminder" }
                 isPrimaryBusy = false
+            }
+        }
+    }
+
+    /// Requests notification permission (if not already determined) and
+    /// schedules a one-shot local notification for the service's known
+    /// start time. Re-tapping replaces the prior request for this church
+    /// (same identifier) rather than stacking duplicates.
+    func scheduleLocalReminder(for date: Date, completion: @escaping (Bool) -> Void) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            guard granted else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = "\(self.service.church.name) is starting soon"
+            content.body = "Their service starts \(self.service.scheduleLabel.lowercased())."
+            content.sound = .default
+            let interval = max(1, date.timeIntervalSinceNow)
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: "service-reminder-\(self.service.church.id.uuidString)",
+                content: content,
+                trigger: trigger
+            )
+            center.add(request) { error in
+                DispatchQueue.main.async { completion(error == nil) }
             }
         }
     }
