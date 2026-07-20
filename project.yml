@@ -54,6 +54,8 @@ targets:
           - Inter.ttf
           - Inter-Italic.ttf
         ITSAppUsesNonExemptEncryption: false
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleDisplayName: Crossed Out
         NSCalendarsWriteOnlyAccessUsageDescription: "Crossed Out can add a calendar event when you plan a church visit."
         NSLocationWhenInUseUsageDescription: "Crossed Out uses your location to find churches near you."
@@ -78,6 +80,8 @@ targets:
     info:
       path: CrossedOutWidgets/Info.plist
       properties:
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleDisplayName: Crossed Out
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
