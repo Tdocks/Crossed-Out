@@ -20,6 +20,15 @@ private enum BibleBooks {
         "Jude", "Revelation"
     ]
 
+    /// First 39 books (Genesis–Malachi) and last 27 (Matthew–Revelation).
+    static let oldTestament: [String] = Array(all.prefix(39))
+    static let newTestament: [String] = Array(all.suffix(27))
+
+    /// Canonical position of a book, for sorting saved notes/highlights.
+    static func canonicalIndex(_ book: String) -> Int {
+        all.firstIndex(of: book) ?? Int.max
+    }
+
     static let chapterCounts: [String: Int] = [
         "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
         "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,
@@ -142,20 +151,15 @@ struct BibleReaderView: View {
             .presentationDetents([.medium])
         }
         .sheet(isPresented: $showNotesList) {
-            NotesListSheet(book: currentBook, chapterNum: currentChapterNum, notes: Array(notes.values)) { verseNumber in
-                if let verse = chapterData.verses.first(where: { $0.number == verseNumber }) {
-                    noteSheetVerse = verse
-                }
+            NotesListSheet(currentBook: currentBook) { book, chapterNum, verse in
+                selectChapter(book: book, chapterNum: chapterNum, scrollToVerse: verse)
             }
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showHighlightsList) {
-            HighlightsListSheet(
-                book: currentBook,
-                chapterNum: currentChapterNum,
-                highlightedVerses: highlightedVerses,
-                onRemove: { verse in toggleHighlight(verse) }
-            )
+            HighlightsListSheet(currentBook: currentBook) { book, chapterNum, verse in
+                selectChapter(book: book, chapterNum: chapterNum, scrollToVerse: verse)
+            }
             .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showSearch) {
@@ -699,30 +703,53 @@ private struct ChapterPickerSheet: View {
 // MARK: - Book Picker Sheet
 
 private struct BookPickerSheet: View {
+    private enum Testament: String, CaseIterable { case old = "Old Testament", new = "New Testament" }
+
     let current: String
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var testament: Testament
+
+    init(current: String, onSelect: @escaping (String) -> Void) {
+        self.current = current
+        self.onSelect = onSelect
+        _testament = State(initialValue: BibleBooks.newTestament.contains(current) ? .new : .old)
+    }
+
+    private var books: [String] {
+        testament == .old ? BibleBooks.oldTestament : BibleBooks.newTestament
+    }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(BibleBooks.all, id: \.self) { name in
-                    Button {
-                        onSelect(name)
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Text(name)
-                                .font(.coUI(15, weight: name == current ? .semibold : .regular))
-                                .foregroundColor(name == current ? .coCrossRed : .coInk)
-                            Spacer()
+        VStack(spacing: 0) {
+            Picker("", selection: $testament) {
+                ForEach(Testament.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(books, id: \.self) { name in
+                        Button {
+                            onSelect(name)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(name)
+                                    .font(.coUI(15, weight: name == current ? .semibold : .regular))
+                                    .foregroundColor(name == current ? .coCrossRed : .coInk)
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 20)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 20)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        CODivider()
                     }
-                    .buttonStyle(.plain)
-                    CODivider()
                 }
             }
         }
@@ -794,39 +821,67 @@ private struct NoteSheet: View {
 
 // MARK: - Notes List Sheet
 
+/// Scope for the saved notes / highlights lists.
+private enum SavedScope: String, CaseIterable { case all = "All", book = "This Book" }
+
 private struct NotesListSheet: View {
-    let book: String
-    let chapterNum: Int
-    let notes: [VerseNote]
-    let onSelect: (Int) -> Void
+    let currentBook: String
+    /// (book, chapter, verse) of the note to jump to.
+    let onOpen: (String, Int, Int) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var scope: SavedScope = .all
+    @State private var allNotes: [SavedNote] = []
+    @State private var loading = true
+
+    private var filtered: [SavedNote] {
+        allNotes
+            .filter { scope == .all || $0.book == currentBook }
+            .sorted { a, b in
+                let ia = BibleBooks.canonicalIndex(a.book)
+                let ib = BibleBooks.canonicalIndex(b.book)
+                if ia != ib { return ia < ib }
+                if a.chapter != b.chapter { return a.chapter < b.chapter }
+                return a.verse < b.verse
+            }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("NOTES — \(book) \(chapterNum)")
+            Text("NOTES")
                 .font(.coUI(11, weight: .semibold))
                 .tracking(1.6)
                 .foregroundColor(.coInkTertiary)
-            if notes.isEmpty {
+
+            Picker("", selection: $scope) {
+                ForEach(SavedScope.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            if loading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                Spacer()
+            } else if filtered.isEmpty {
                 COEmptyState(
                     icon: .note,
-                    title: "No notes in this chapter",
+                    title: scope == .all ? "No notes yet" : "No notes in \(currentBook)",
                     message: "Long-press any verse to add one."
                 )
                 Spacer()
             } else {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(notes.sorted(by: { $0.verse < $1.verse })) { note in
+                        ForEach(filtered) { note in
                             Button {
+                                onOpen(note.book, note.chapter, note.verse)
                                 dismiss()
-                                onSelect(note.verse)
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Verse \(note.verse)")
+                                    Text("\(note.book) \(note.chapter):\(note.verse)")
                                         .font(.coUI(12, weight: .semibold))
-                                        .foregroundColor(.coInkTertiary)
+                                        .foregroundColor(.coCrossRed)
                                     Text(note.note)
                                         .font(.coUI(14))
                                         .foregroundColor(.coInk)
@@ -847,48 +902,86 @@ private struct NotesListSheet: View {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.coPaper.ignoresSafeArea())
+        .task {
+            allNotes = (try? await SupabaseService.shared.fetchAllNotes()) ?? []
+            loading = false
+        }
     }
 }
 
 // MARK: - Highlights List Sheet
 
 private struct HighlightsListSheet: View {
-    let book: String
-    let chapterNum: Int
-    let highlightedVerses: [BibleVerse]
-    let onRemove: (BibleVerse) -> Void
+    let currentBook: String
+    /// (book, chapter, verse) of the highlight to jump to.
+    let onOpen: (String, Int, Int) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var scope: SavedScope = .all
+    @State private var allHighlights: [SavedHighlight] = []
+    @State private var loading = true
+
+    private var filtered: [SavedHighlight] {
+        allHighlights
+            .filter { scope == .all || $0.book == currentBook }
+            .sorted { a, b in
+                let ia = BibleBooks.canonicalIndex(a.book)
+                let ib = BibleBooks.canonicalIndex(b.book)
+                if ia != ib { return ia < ib }
+                if a.chapter != b.chapter { return a.chapter < b.chapter }
+                return a.verse < b.verse
+            }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("HIGHLIGHTS — \(book) \(chapterNum)")
+            Text("HIGHLIGHTS")
                 .font(.coUI(11, weight: .semibold))
                 .tracking(1.6)
                 .foregroundColor(.coInkTertiary)
-            if highlightedVerses.isEmpty {
+
+            Picker("", selection: $scope) {
+                ForEach(SavedScope.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            if loading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                Spacer()
+            } else if filtered.isEmpty {
                 COEmptyState(
                     icon: .highlight,
-                    title: "No highlights in this chapter",
+                    title: scope == .all ? "No highlights yet" : "No highlights in \(currentBook)",
                     message: "Long-press any verse to highlight it."
                 )
                 Spacer()
             } else {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(highlightedVerses) { verse in
-                            HStack(alignment: .top, spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Verse \(verse.number)")
-                                        .font(.coUI(12, weight: .semibold))
-                                        .foregroundColor(.coInkTertiary)
-                                    Text(verse.text)
-                                        .font(.coUI(14))
-                                        .foregroundColor(.coInk)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .multilineTextAlignment(.leading)
-                                }
-                                Spacer(minLength: 12)
+                        ForEach(filtered) { h in
+                            HStack(alignment: .center, spacing: 12) {
                                 Button {
-                                    onRemove(verse)
+                                    onOpen(h.book, h.chapter, h.verse)
+                                    dismiss()
+                                } label: {
+                                    Text("\(h.book) \(h.chapter):\(h.verse)")
+                                        .font(.coUI(14, weight: .medium))
+                                        .foregroundColor(.coInk)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                Button {
+                                    let target = h
+                                    allHighlights.removeAll { $0.id == target.id }
+                                    Task {
+                                        await SupabaseService.shared.setHighlight(
+                                            book: target.book, chapter: target.chapter,
+                                            verse: target.verse, on: false
+                                        )
+                                    }
                                 } label: {
                                     Text("Remove")
                                         .font(.coUI(12, weight: .semibold))
@@ -897,7 +990,6 @@ private struct HighlightsListSheet: View {
                                 .buttonStyle(.plain)
                             }
                             .padding(.vertical, 12)
-                            .contentShape(Rectangle())
                             CODivider()
                         }
                     }
@@ -907,6 +999,10 @@ private struct HighlightsListSheet: View {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.coPaper.ignoresSafeArea())
+        .task {
+            allHighlights = (try? await SupabaseService.shared.fetchAllHighlights()) ?? []
+            loading = false
+        }
     }
 }
 

@@ -1417,6 +1417,44 @@ private struct VerseBookmarkDTO: Codable {
     }
 }
 
+/// A note carrying its full book/chapter/verse reference — for the global
+/// "all saved" list (unlike VerseNote, which is scoped to one chapter).
+struct SavedNote: Identifiable, Hashable {
+    let id: UUID
+    let book: String
+    let chapter: Int
+    let verse: Int
+    let note: String
+}
+
+private struct SavedNoteDTO: Codable {
+    let id: UUID
+    let book: String
+    let chapter: Int
+    let verse: Int
+    let note: String
+    func toModel() -> SavedNote {
+        SavedNote(id: id, book: book, chapter: chapter, verse: verse, note: note)
+    }
+}
+
+/// A highlighted verse with its full reference — for the global list.
+struct SavedHighlight: Identifiable, Hashable {
+    let book: String
+    let chapter: Int
+    let verse: Int
+    var id: String { "\(book)|\(chapter)|\(verse)" }
+}
+
+private struct SavedHighlightDTO: Codable {
+    let book: String
+    let chapter: Int
+    let verse: Int
+    func toModel() -> SavedHighlight {
+        SavedHighlight(book: book, chapter: chapter, verse: verse)
+    }
+}
+
 extension SupabaseService {
     /// Fetches the current user's notes for a given book/chapter, ordered by verse.
     func fetchNotes(book: String, chapter: Int) async throws -> [VerseNote] {
@@ -1428,6 +1466,30 @@ extension SupabaseService {
             .eq("book", value: book)
             .eq("chapter", value: chapter)
             .order("verse", ascending: true)
+            .execute()
+            .value
+        return dtos.map { $0.toModel() }
+    }
+
+    /// Every note the current user has saved, across all books/chapters.
+    func fetchAllNotes() async throws -> [SavedNote] {
+        guard let uid = currentUserID else { return [] }
+        let dtos: [SavedNoteDTO] = try await client
+            .from("user_notes")
+            .select("id,book,chapter,verse,note")
+            .eq("user_id", value: uid)
+            .execute()
+            .value
+        return dtos.map { $0.toModel() }
+    }
+
+    /// Every verse the current user has highlighted, across all books/chapters.
+    func fetchAllHighlights() async throws -> [SavedHighlight] {
+        guard let uid = currentUserID else { return [] }
+        let dtos: [SavedHighlightDTO] = try await client
+            .from("user_highlights")
+            .select("book,chapter,verse")
+            .eq("user_id", value: uid)
             .execute()
             .value
         return dtos.map { $0.toModel() }
